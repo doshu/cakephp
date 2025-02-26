@@ -39,4 +39,20 @@ class SmtpTestTransport extends SmtpTransport
 
         return call_user_func_array([$this, $method], $args);
     }
+
+    /**
+     * Returns the authentication type detected and used to connect to the SMTP server.
+     * If no authentication was detected, null is returned.
+     *
+     * @return string|null
+     */
+    public function getAuthType(): ?string
+    {
+        return $this->authType;
+    }
+
+    public function setAuthType(string $type): void
+    {
+        $this->authType = $type;
+    }
 }

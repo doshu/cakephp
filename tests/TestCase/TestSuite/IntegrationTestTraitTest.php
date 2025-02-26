@@ -37,6 +37,7 @@ use LogicException;
 use OutOfBoundsException;
 use PHPUnit\Framework\AssertionFailedError;
 use stdClass;
+use TestApp\ReflectionDependency;
 
 /**
  * Self test of the IntegrationTestTrait
@@ -618,7 +619,7 @@ class IntegrationTestTraitTest extends TestCase
             'controller' => 'Posts',
             'action' => 'hostData',
             '_host' => 'app.example.org',
-            '_ssl' => true,
+            '_https' => true,
         ]);
         $this->assertResponseOk();
         $this->assertResponseContains('"isSsl":true');
@@ -741,7 +742,10 @@ class IntegrationTestTraitTest extends TestCase
     public function testAssertCookieNotSet(): void
     {
         $this->cookie('test', 'value');
-        $this->get('/cookie_component_test/remove_cookie/test');
+        $this->get('/posts/index');
+        $this->assertCookieNotSet('test');
+
+        $this->get('/posts/redirectWithCookie');
         $this->assertCookieNotSet('test');
     }
 
@@ -765,6 +769,40 @@ class IntegrationTestTraitTest extends TestCase
         $this->expectException(AssertionFailedError::class);
         $this->expectExceptionMessage('No response set, cannot assert content.');
         $this->assertCookieNotSet('remember_me');
+    }
+
+    /**
+     * Tests assertCookieIsSet assertion
+     */
+    public function testAssertCookieIsSet(): void
+    {
+        $this->get('/posts/secretCookie');
+        $this->assertCookieIsSet('secrets');
+
+        $this->get('/posts/redirectWithCookie');
+        $this->assertCookieIsSet('remember');
+    }
+
+    /**
+     * Tests the failure message for assertCookieIsSet
+     */
+    public function testCookieIsSetFailure(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('Failed asserting that \'not-secrets\' cookie is set');
+        $this->post('/posts/secretCookie');
+        $this->assertCookieIsSet('not-secrets');
+    }
+
+    /**
+     * Tests the failure message for assertCookieIsSet when no
+     * response whas generated
+     */
+    public function testCookieIsSetFailureNoResponse(): void
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('No response set, cannot assert content.');
+        $this->assertCookieIsSet('secrets');
     }
 
     /**
@@ -1491,6 +1529,20 @@ class IntegrationTestTraitTest extends TestCase
     }
 
     /**
+     * Test for assertion message generation for previous.
+     *
+     * @return void
+     */
+    public function testAssertMessagePrevious()
+    {
+        $this->expectException(AssertionFailedError::class);
+        $this->expectExceptionMessage('Caused by RuntimeException');
+
+        $this->get('/posts/throw_chained');
+        $this->assertContentType('test');
+    }
+
+    /**
      * data provider for assertion failure messages
      *
      * @return array
@@ -1690,6 +1742,19 @@ class IntegrationTestTraitTest extends TestCase
         $this->get('/dependencies/requiredDep');
         $this->assertResponseOk();
         $this->assertResponseContains('"mock":true', 'Contains the data from the stdClass mock container.');
+    }
+
+    /**
+     * Test that mockService() injects into controllers.
+     */
+    public function testHandleWithMockServicesFromReflectionContainer(): void
+    {
+        $this->mockService(ReflectionDependency::class, function () {
+            return new ReflectionDependency();
+        });
+        $this->get('/dependencies/reflectionDep');
+        $this->assertResponseOk();
+        $this->assertResponseContains('{"dep":{}}', 'Contains the data from the reflection container');
     }
 
     /**

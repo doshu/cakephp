@@ -19,6 +19,7 @@ namespace Cake\Test\TestCase\ORM;
 use Cake\Cache\Engine\FileEngine;
 use Cake\Collection\Collection;
 use Cake\Collection\Iterator\BufferedIterator;
+use Cake\Database\Connection;
 use Cake\Database\Driver\Mysql;
 use Cake\Database\Driver\Sqlite;
 use Cake\Database\DriverInterface;
@@ -160,6 +161,48 @@ class QueryTest extends TestCase
         $this->assertSame($this->table, $result);
     }
 
+    public function testSelectAlso(): void
+    {
+        $table = $this->getTableLocator()->get('Articles');
+        $query = new Query($this->connection, $table);
+        $results = $query
+            ->selectAlso(['extra' => 'id'])
+            ->where(['author_id' => 3])
+            ->disableHydration()
+            ->first();
+
+        $this->assertSame(
+            ['extra' => 2, 'id' => 2, 'author_id' => 3, 'title' => 'Second Article', 'body' => 'Second Article Body', 'published' => 'Y'],
+            $results
+        );
+
+        $query = new Query($this->connection, $table);
+        $results = $query
+            ->select('id')
+            ->selectAlso(['extra' => 'id'])
+            ->where(['author_id' => 3])
+            ->disableHydration()
+            ->first();
+
+        $this->assertSame(
+            ['id' => 2, 'extra' => 2, 'author_id' => 3, 'title' => 'Second Article', 'body' => 'Second Article Body', 'published' => 'Y'],
+            $results
+        );
+
+        $query = new Query($this->connection, $table);
+        $results = $query
+            ->selectAlso(['extra' => 'id'])
+            ->select('id')
+            ->where(['author_id' => 3])
+            ->disableHydration()
+            ->first();
+
+        $this->assertSame(
+            ['extra' => 2, 'id' => 2, 'author_id' => 3, 'title' => 'Second Article', 'body' => 'Second Article Body', 'published' => 'Y'],
+            $results
+        );
+    }
+
     /**
      * Tests that results are grouped correctly when using contain()
      * and results are not hydrated
@@ -285,7 +328,7 @@ class QueryTest extends TestCase
         ];
         $this->assertEquals($expected, $results);
 
-        $results = $query->repository($table)
+        $results = $query->setRepository($table)
             ->select()
             ->contain(['articles' => ['conditions' => ['articles.id' => 2]]])
             ->enableHydration(false)
@@ -683,7 +726,7 @@ class QueryTest extends TestCase
         $table = $this->getTableLocator()->get('Articles');
         $table->hasMany('Comments');
 
-        $results = $query->repository($table)
+        $results = $query->setRepository($table)
             ->select()
             ->disableHydration()
             ->matching('Comments', function ($q) {
@@ -722,7 +765,7 @@ class QueryTest extends TestCase
         $query = new Query($this->connection, $table);
         $table->hasMany('Comments');
 
-        $result = $query->repository($table)
+        $result = $query->setRepository($table)
             ->matching('Comments', function ($q) {
                 return $q->where(['Comments.user_id' => 4]);
             })
@@ -748,7 +791,7 @@ class QueryTest extends TestCase
         ]);
         $table->belongsToMany('Tags');
 
-        $results = $query->repository($table)->select()
+        $results = $query->setRepository($table)->select()
             ->matching('Tags', function ($q) {
                 return $q->where(['Tags.id' => 3]);
             })
@@ -813,7 +856,7 @@ class QueryTest extends TestCase
         $table->hasMany('articles');
         $this->getTableLocator()->get('articles')->belongsToMany('tags');
 
-        $results = $query->repository($table)
+        $results = $query->setRepository($table)
             ->select()
             ->enableHydration(false)
             ->matching('articles.tags', function ($q) {
@@ -1178,14 +1221,16 @@ class QueryTest extends TestCase
      */
     public function testFirstUnbuffered(): void
     {
-        $table = $this->getTableLocator()->get('Articles');
-        $query = new Query($this->connection, $table);
-        $query->select(['id']);
+        $this->deprecated(function () {
+            $table = $this->getTableLocator()->get('Articles');
+            $query = new Query($this->connection, $table);
+            $query->select(['id']);
 
-        $first = $query->enableHydration(false)
-            ->enableBufferedResults(false)->first();
+            $first = $query->enableHydration(false)
+                ->enableBufferedResults(false)->first();
 
-        $this->assertEquals(['id' => 1], $first);
+            $this->assertEquals(['id' => 1], $first);
+        });
     }
 
     /**
@@ -1238,7 +1283,6 @@ class QueryTest extends TestCase
         $table = $this->getTableLocator()->get('authors');
         $this->getTableLocator()->get('articles');
         $table->hasMany('articles', [
-            'propertyName' => 'articles',
             'sort' => ['articles.id' => 'asc'],
         ]);
         $query = new Query($this->connection, $table);
@@ -1415,7 +1459,6 @@ class QueryTest extends TestCase
         $table = $this->getTableLocator()->get('authors');
         $article = $this->getTableLocator()->get('articles');
         $table->hasMany('articles', [
-            'propertyName' => 'articles',
             'sort' => ['articles.id' => 'asc'],
         ]);
         $article->belongsTo('authors', ['strategy' => $strategy]);
@@ -1474,7 +1517,6 @@ class QueryTest extends TestCase
             'entityClass' => '\\' . $articleEntity,
         ]);
         $table->hasMany('articles', [
-            'propertyName' => 'articles',
             'sort' => ['articles.id' => 'asc'],
         ]);
         $query = new Query($this->connection, $table);
@@ -1687,8 +1729,7 @@ class QueryTest extends TestCase
     public function testSelectRandom(): void
     {
         $table = $this->getTableLocator()->get('articles');
-        $query = $table
-            ->query();
+        $query = $table->selectQuery();
 
         $query->select(['s' => $query->func()->rand()]);
         $result = $query
@@ -1707,7 +1748,7 @@ class QueryTest extends TestCase
     {
         $table = $this->getTableLocator()->get('articles');
 
-        $result = $table->query()
+        $result = $table->updateQuery()
             ->update()
             ->set(['title' => 'First'])
             ->execute();
@@ -1724,7 +1765,7 @@ class QueryTest extends TestCase
         $this->skipIf(!$this->connection->getDriver() instanceof Mysql);
         $table = $this->getTableLocator()->get('articles');
 
-        $query = $table->query();
+        $query = $table->updateQuery();
         $result = $query->update($query->newExpr('articles, authors'))
             ->set(['title' => 'First'])
             ->where(['articles.author_id = authors.id'])
@@ -1742,7 +1783,7 @@ class QueryTest extends TestCase
     {
         $table = $this->getTableLocator()->get('articles');
 
-        $result = $table->query()
+        $result = $table->insertQuery()
             ->insert(['title'])
             ->values(['title' => 'First'])
             ->values(['title' => 'Second'])
@@ -1761,8 +1802,7 @@ class QueryTest extends TestCase
     {
         $table = $this->getTableLocator()->get('articles');
 
-        $result = $table->query()
-            ->delete()
+        $result = $table->deleteQuery()
             ->where(['id >=' => 1])
             ->execute();
 
@@ -1784,25 +1824,25 @@ class QueryTest extends TestCase
         $collection = new Collection([]);
 
         return [
-            ['filter', $identity, $collection],
-            ['reject', $identity, $collection],
-            ['every', $identity, false],
-            ['some', $identity, false],
-            ['contains', $identity, true],
-            ['map', $identity, $collection],
-            ['reduce', $identity, $collection],
-            ['extract', $identity, $collection],
-            ['max', $identity, 9],
-            ['min', $identity, 1],
-            ['sortBy', $identity, $collection],
-            ['groupBy', $identity, $collection],
-            ['countBy', $identity, $collection],
-            ['shuffle', $identity, $collection],
-            ['sample', 10, $collection],
-            ['take', 1, $collection],
-            ['append', new \ArrayIterator(), $collection],
-            ['compile', true, $collection],
-            ['isEmpty', true, true],
+            ['filter', [$identity], $collection],
+            ['reject', [$identity], $collection],
+            ['every', [$identity], false],
+            ['some', [$identity], false],
+            ['contains', [$identity], true],
+            ['map', [$identity], $collection],
+            ['reduce', [$identity], $collection],
+            ['extract', [$identity], $collection],
+            ['max', [$identity], 9],
+            ['min', [$identity], 1],
+            ['sortBy', [$identity], $collection],
+            ['groupBy', [$identity], $collection],
+            ['countBy', [$identity], $collection],
+            ['shuffle', [], $collection],
+            ['sample', [10], $collection],
+            ['take', [1], $collection],
+            ['append', [new \ArrayIterator()], $collection],
+            ['compile', [true], $collection],
+            ['isEmpty', [], true],
         ];
     }
 
@@ -1837,10 +1877,10 @@ class QueryTest extends TestCase
      * Tests that query can proxy collection methods
      *
      * @dataProvider collectionMethodsProvider
-     * @param mixed $arg
+     * @param mixed $args
      * @param mixed $return
      */
-    public function testDeprecatedCollectionProxy(string $method, $arg, $return): void
+    public function testDeprecatedCollectionProxy(string $method, $args, $return): void
     {
         $query = $this->getMockBuilder('Cake\ORM\Query')
             ->onlyMethods(['all'])
@@ -1856,31 +1896,12 @@ class QueryTest extends TestCase
             ->will($this->returnValue($resultSet));
         $resultSet->expects($this->once())
             ->method($method)
-            ->with($arg, 99)
+            ->with(...$args)
             ->will($this->returnValue($return));
 
-        $this->deprecated(function () use ($return, $query, $method, $arg) {
-            $this->assertSame($return, $query->{$method}($arg, 99));
+        $this->deprecated(function () use ($return, $query, $method, $args) {
+            $this->assertSame($return, $query->{$method}(...$args));
         });
-    }
-
-    /**
-     * Tests deprecation path for proxy collection methods.
-     *
-     * @dataProvider collectionMethodsProvider
-     */
-    public function testDeprecatedPathCollectionProxy(string $method, $arg, $return): void
-    {
-        $this->expectDeprecation();
-        $this->expectDeprecationMessage("Calling `Cake\Datasource\ResultSetInterface` methods, such as `$method()`, on queries is deprecated.");
-
-        $query = $this->getMockBuilder('Cake\ORM\Query')
-            ->onlyMethods(['all'])
-            ->setConstructorArgs([$this->connection, $this->table])
-            ->getMock();
-        $query->select();
-
-        $this->assertSame($return, $query->{$method}($arg, 99));
     }
 
     /**
@@ -2649,7 +2670,6 @@ class QueryTest extends TestCase
         $table->hasMany('articles');
         $query = $table->find()
             ->where(['id > ' => 1])
-            ->enableBufferedResults(false)
             ->enableHydration(false)
             ->matching('articles')
             ->applyOptions(['foo' => 'bar'])
@@ -2689,7 +2709,7 @@ class QueryTest extends TestCase
             'decorators' => 0,
             'executed' => false,
             'hydrate' => false,
-            'buffered' => false,
+            'buffered' => true,
             'formatters' => 1,
             'mapReducers' => 1,
             'contain' => [],
@@ -3210,7 +3230,7 @@ class QueryTest extends TestCase
         $table->hasMany('articles');
         $this->getTableLocator()->get('articles')->belongsToMany('tags');
 
-        $result = $query->repository($table)
+        $result = $query->setRepository($table)
             ->select()
             ->matching('articles.tags', function ($q) {
                 return $q->where(['tags.id' => 2]);
@@ -4092,5 +4112,18 @@ class QueryTest extends TestCase
             ->disableHydration()
             ->disableResultsCasting()
             ->firstOrFail();
+    }
+
+    public function testORMQueryUseReadRoleWorks(): void
+    {
+        $articles = $this->getTableLocator()->get('Articles');
+
+        // Make sure it defaults to the write role
+        $query = $articles->find();
+        $this->assertEquals(Connection::ROLE_WRITE, $query->getConnectionRole());
+
+        // Make sure it can be changed to the read role
+        $query = $articles->find()->useReadRole();
+        $this->assertEquals(Connection::ROLE_READ, $query->getConnectionRole());
     }
 }

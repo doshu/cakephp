@@ -2,15 +2,15 @@
 declare(strict_types=1);
 
 /**
- * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
- * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
+ * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
  * Licensed under The MIT License
  * Redistributions of files must retain the above copyright notice.
  *
- * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
- * @link          http://cakephp.org CakePHP(tm) Project
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
+ * @link          https://cakephp.org CakePHP(tm) Project
  * @since         3.5.0
- * @license       http://www.opensource.org/licenses/mit-license.php MIT License
+ * @license       https://www.opensource.org/licenses/mit-license.php MIT License
  */
 namespace Cake\Test\TestCase\Http\Cookie;
 
@@ -474,15 +474,25 @@ class CookieCollectionTest extends TestCase
      */
     public function testCreateFromServerRequest(): void
     {
-        $request = new ServerRequest(['cookies' => ['name' => 'val', 'cakephp' => 'rocks']]);
+        $request = new ServerRequest([
+            'cookies' => [
+                'name' => 'val',
+                'cakephp' => 'rocks',
+                '123' => 'a integer key cookie',
+            ],
+        ]);
         $cookies = CookieCollection::createFromServerRequest($request);
-        $this->assertCount(2, $cookies);
+        $this->assertCount(3, $cookies);
         $this->assertTrue($cookies->has('name'));
         $this->assertTrue($cookies->has('cakephp'));
+        $this->assertTrue($cookies->has('123'));
 
         $cookie = $cookies->get('name');
         $this->assertSame('val', $cookie->getValue());
         $this->assertSame('/', $cookie->getPath());
         $this->assertSame('', $cookie->getDomain(), 'No domain on request cookies');
+
+        $cookie = $cookies->get('123');
+        $this->assertSame('a integer key cookie', $cookie->getValue());
     }
 }

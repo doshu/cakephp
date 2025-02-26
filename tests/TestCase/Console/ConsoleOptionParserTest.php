@@ -573,11 +573,26 @@ class ConsoleOptionParserTest extends TestCase
     /**
      * test positional argument parsing.
      */
-    public function testPositionalArgument(): void
+    public function testAddArgument(): void
     {
         $parser = new ConsoleOptionParser('test', false);
         $result = $parser->addArgument('name', ['help' => 'An argument']);
         $this->assertEquals($parser, $result, 'Should return this');
+    }
+
+    /**
+     * Add arguments that were once considered the same
+     */
+    public function testAddArgumentDuplicate(): void
+    {
+        $parser = new ConsoleOptionParser('test', false);
+        $parser
+            ->addArgument('first', ['help' => 'An argument', 'choices' => [1, 2]])
+            ->addArgument('second', ['help' => 'An argument', 'choices' => [1, 2]]);
+        $args = $parser->arguments();
+        $this->assertCount(2, $args);
+        $this->assertEquals('first', $args[0]->name());
+        $this->assertEquals('second', $args[1]->name());
     }
 
     /**
@@ -712,6 +727,28 @@ class ConsoleOptionParserTest extends TestCase
 
         $result = $parser->arguments();
         $this->assertCount(2, $result, 'Not enough arguments');
+    }
+
+    public function testParseArgumentsDoubleDash(): void
+    {
+        $parser = new ConsoleOptionParser('test');
+
+        $result = $parser->parse(['one', 'two', '--', '-h', '--help', '--test=value'], $this->io);
+        $this->assertEquals(['one', 'two', '-h', '--help', '--test=value'], $result[1]);
+    }
+
+    public function testParseArgumentsOptionsDoubleDash(): void
+    {
+        $parser = new ConsoleOptionParser('test', false);
+        $parser->addOption('test');
+
+        $result = $parser->parse(['--test=value', '--', '--test'], $this->io);
+        $this->assertEquals(['test' => 'value', 'help' => false], $result[0]);
+        $this->assertEquals(['--test'], $result[1]);
+
+        $result = $parser->parse(['--', '--test'], $this->io);
+        $this->assertEquals(['help' => false], $result[0]);
+        $this->assertEquals(['--test'], $result[1]);
     }
 
     /**

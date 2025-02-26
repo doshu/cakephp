@@ -2,17 +2,17 @@
 declare(strict_types=1);
 
 /**
- * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
- * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
+ * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
  *
  * Licensed under The MIT License
  * For full copyright and license information, please see the LICENSE.txt
  * Redistributions of files must retain the above copyright notice.
  *
- * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
- * @link          http://cakephp.org CakePHP(tm) Project
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
+ * @link          https://cakephp.org CakePHP(tm) Project
  * @since         4.0.0
- * @license       http://www.opensource.org/licenses/mit-license.php MIT License
+ * @license       https://www.opensource.org/licenses/mit-license.php MIT License
  */
 namespace Cake\Test\TestCase\Http\Middleware;
 
@@ -21,6 +21,7 @@ use Cake\Http\Exception\BadRequestException;
 use Cake\Http\Middleware\HttpsEnforcerMiddleware;
 use Cake\Http\Response;
 use Cake\Http\ServerRequest;
+use Cake\Http\ServerRequestFactory;
 use Cake\TestSuite\TestCase;
 use Laminas\Diactoros\Response\RedirectResponse;
 use Laminas\Diactoros\Uri;
@@ -225,5 +226,31 @@ class HttpsEnforcerMiddlewareTest extends TestCase
         $result = $middleware->process($request, $handler);
         $this->assertInstanceOf(Response::class, $result);
         $this->assertSame('skipped', (string)$result->getBody());
+    }
+
+    /**
+     * Test that setting trustedProxies works correctly
+     */
+    public function testTrustedProxies(): void
+    {
+        $server = [
+            'DOCUMENT_ROOT' => '/cake/repo/webroot',
+            'PHP_SELF' => '/index.php',
+            'REQUEST_URI' => '/posts/add',
+            'HTTP_X_FORWARDED_PROTO' => 'https',
+        ];
+        $request = ServerRequestFactory::fromGlobals($server);
+
+        $handler = new TestRequestHandler(function () {
+            return new Response();
+        });
+
+        $middleware = new HttpsEnforcerMiddleware();
+        $result = $middleware->process($request, $handler);
+        $this->assertInstanceOf(RedirectResponse::class, $result);
+
+        $middleware = new HttpsEnforcerMiddleware(['trustedProxies' => []]);
+        $result = $middleware->process($request, $handler);
+        $this->assertInstanceOf(Response::class, $result);
     }
 }

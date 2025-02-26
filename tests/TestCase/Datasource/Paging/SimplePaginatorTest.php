@@ -2,17 +2,17 @@
 declare(strict_types=1);
 
 /**
- * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
- * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
+ * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
  *
  * Licensed under The MIT License
  * For full copyright and license information, please see the LICENSE.txt
  * Redistributions of files must retain the above copyright notice
  *
- * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
- * @link          http://cakephp.org CakePHP(tm) Project
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
+ * @link          https://cakephp.org CakePHP(tm) Project
  * @since         3.9.0
- * @license       http://www.opensource.org/licenses/mit-license.php MIT License
+ * @license       https://www.opensource.org/licenses/mit-license.php MIT License
  */
 namespace Cake\Test\TestCase\Datasource\Paging;
 
@@ -97,30 +97,32 @@ class SimplePaginatorTest extends NumericPaginatorTest
      */
     public function testPaginateCustomFindFieldsArray(): void
     {
-        $table = $this->getTableLocator()->get('PaginatorPosts');
-        $data = ['author_id' => 3, 'title' => 'Fourth Article', 'body' => 'Article Body, unpublished', 'published' => 'N'];
-        $table->save(new Entity($data));
+        $this->deprecated(function () {
+            $table = $this->getTableLocator()->get('PaginatorPosts');
+            $data = ['author_id' => 3, 'title' => 'Fourth Article', 'body' => 'Article Body, unpublished', 'published' => 'N'];
+            $table->save(new Entity($data));
 
-        $settings = [
-            'finder' => 'list',
-            'conditions' => ['PaginatorPosts.published' => 'Y'],
-            'limit' => 2,
-        ];
-        $results = $this->Paginator->paginate($table, [], $settings);
+            $settings = [
+                'finder' => 'list',
+                'conditions' => ['PaginatorPosts.published' => 'Y'],
+                'limit' => 2,
+            ];
+            $results = $this->Paginator->paginate($table, [], $settings);
 
-        $result = $results->toArray();
-        $expected = [
-            1 => 'First Post',
-            2 => 'Second Post',
-        ];
-        $this->assertEquals($expected, $result);
+            $result = $results->toArray();
+            $expected = [
+                1 => 'First Post',
+                2 => 'Second Post',
+            ];
+            $this->assertEquals($expected, $result);
 
-        $result = $this->Paginator->getPagingParams()['PaginatorPosts'];
-        $this->assertSame(2, $result['current']);
-        $this->assertNull($result['count']);
-        $this->assertSame(0, $result['pageCount']);
-        $this->assertTrue($result['nextPage']);
-        $this->assertFalse($result['prevPage']);
+            $result = $this->Paginator->getPagingParams()['PaginatorPosts'];
+            $this->assertSame(2, $result['current']);
+            $this->assertNull($result['count']);
+            $this->assertSame(0, $result['pageCount']);
+            $this->assertTrue($result['nextPage']);
+            $this->assertFalse($result['prevPage']);
+        });
     }
 
     /**
@@ -131,7 +133,6 @@ class SimplePaginatorTest extends NumericPaginatorTest
         $settings = [
             'PaginatorPosts' => [
                 'finder' => 'published',
-                'fields' => ['id', 'title'],
                 'maxLimit' => 10,
             ],
         ];

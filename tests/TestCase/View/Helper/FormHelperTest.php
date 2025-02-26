@@ -131,7 +131,7 @@ class FormHelperTest extends TestCase
     public function tearDown(): void
     {
         parent::tearDown();
-        unset($this->Form, $this->Controller, $this->View);
+        unset($this->Form, $this->View);
     }
 
     /**
@@ -488,6 +488,37 @@ class FormHelperTest extends TestCase
         ]);
         $this->Form->end();
         $this->assertNotEquals('custom input element', $this->Form->templater()->get('input'));
+    }
+
+    /**
+     * Test create() with the templates option.
+     */
+    public function testCreateTemplatesRequiredClass(): void
+    {
+        $this->Form->create($this->article, [
+            'templates' => [
+                'requiredClass' => 'is-required',
+            ],
+        ]);
+        $result = $this->Form->control('title');
+        $expected = [
+            'div' => ['class' => 'input text is-required'],
+            'label' => ['for' => 'title'],
+            'Title',
+            '/label',
+            'input' => [
+                'type' => 'text',
+                'name' => 'title',
+                'id' => 'title',
+                'required' => 'required',
+                'data-validity-message' => 'This field cannot be left empty',
+                'oninvalid' => 'this.setCustomValidity(&#039;&#039;); if (!this.value) this.setCustomValidity(this.dataset.validityMessage)',
+                'oninput' => 'this.setCustomValidity(&#039;&#039;)',
+                'aria-required' => 'true',
+            ],
+            '/div',
+        ];
+        $this->assertHtml($expected, $result);
     }
 
     /**
@@ -2823,6 +2854,27 @@ class FormHelperTest extends TestCase
         ];
         $this->assertHtml($expected, $result);
 
+        $result = $this->Form->control('Contact.email', [
+            'templates' => [
+                'formGroup' => '{{input}}',
+                'inputContainer' => '<div><div>{{label}}</div>{{content}}</div>',
+            ],
+        ]);
+        $expected = [
+            '<div',
+            '<div',
+            'label' => ['for' => 'contact-email'],
+            'Email',
+            '/label',
+            '/div',
+            ['input' => [
+                'type' => 'email', 'name' => 'Contact[email]',
+                'id' => 'contact-email', 'maxlength' => 255,
+            ]],
+            '/div',
+        ];
+        $this->assertHtml($expected, $result);
+
         $result = $this->Form->control('Contact.email', ['type' => 'text']);
         $expected = [
             'div' => ['class' => 'input text'],
@@ -4439,19 +4491,6 @@ class FormHelperTest extends TestCase
      */
     public function testRadio(): void
     {
-        $result = $this->Form->radio('Model.field', ['option A']);
-        $expected = [
-            'input' => ['type' => 'hidden', 'name' => 'Model[field]', 'value' => '', 'id' => 'model-field'],
-            'label' => ['for' => 'model-field-0'],
-            ['input' => ['type' => 'radio', 'name' => 'Model[field]', 'value' => '0', 'id' => 'model-field-0']],
-            'option A',
-            '/label',
-        ];
-        $this->assertHtml($expected, $result);
-
-        $result = $this->Form->radio('Model.field', new Collection(['option A']));
-        $this->assertHtml($expected, $result);
-
         $result = $this->Form->radio('Model.field', ['option A', 'option B']);
         $expected = [
             'input' => ['type' => 'hidden', 'name' => 'Model[field]', 'value' => '', 'id' => 'model-field'],
@@ -4466,20 +4505,23 @@ class FormHelperTest extends TestCase
         ];
         $this->assertHtml($expected, $result);
 
+        $result = $this->Form->radio('Model.field', new Collection(['option A', 'option B']));
+        $this->assertHtml($expected, $result);
+
         $result = $this->Form->radio(
-            'Employee.gender',
-            ['male' => 'Male', 'female' => 'Female'],
-            ['form' => 'my-form']
+            'Employee.vegetarian',
+            ['yes' => 'Yes', 'no' => 'No'],
+            ['form' => 'my-form', 'id' => 'id-veg']
         );
         $expected = [
-            'input' => ['type' => 'hidden', 'name' => 'Employee[gender]', 'value' => '', 'form' => 'my-form', 'id' => 'employee-gender'],
-            ['label' => ['for' => 'employee-gender-male']],
-            ['input' => ['type' => 'radio', 'name' => 'Employee[gender]', 'value' => 'male', 'id' => 'employee-gender-male', 'form' => 'my-form']],
-            'Male',
+            'input' => ['type' => 'hidden', 'name' => 'Employee[vegetarian]', 'value' => '', 'form' => 'my-form', 'id' => 'id-veg'],
+            ['label' => ['for' => 'id-veg-yes']],
+            ['input' => ['type' => 'radio', 'name' => 'Employee[vegetarian]', 'value' => 'yes', 'id' => 'id-veg-yes', 'form' => 'my-form']],
+            'Yes',
             '/label',
-            ['label' => ['for' => 'employee-gender-female']],
-            ['input' => ['type' => 'radio', 'name' => 'Employee[gender]', 'value' => 'female', 'id' => 'employee-gender-female', 'form' => 'my-form']],
-            'Female',
+            ['label' => ['for' => 'id-veg-no']],
+            ['input' => ['type' => 'radio', 'name' => 'Employee[vegetarian]', 'value' => 'no', 'id' => 'id-veg-no', 'form' => 'my-form']],
+            'No',
             '/label',
         ];
         $this->assertHtml($expected, $result);
@@ -5663,6 +5705,42 @@ class FormHelperTest extends TestCase
         $result = $this->Form->multiCheckbox('category', ['1', '2'], [
             'name' => 'fish',
         ]);
+        $this->assertHtml($expected, $result);
+    }
+
+    /**
+     * testSelectCheckboxMultipleOverrideName method
+     *
+     * Test that select() with multiple = checkbox works with overriding name attribute.
+     */
+    public function testSelectCheckboxMultipleCustomId(): void
+    {
+        $result = $this->Form->select('category', ['1', '2'], [
+            'multiple' => 'checkbox',
+            'id' => 'cat',
+        ]);
+        $expected = [
+            'input' => ['type' => 'hidden', 'name' => 'category', 'value' => '', 'id' => 'cat'],
+            ['div' => ['class' => 'checkbox']],
+                ['label' => ['for' => 'cat-0']],
+                    ['input' => ['type' => 'checkbox', 'name' => 'category[]', 'value' => '0', 'id' => 'cat-0']],
+                    '1',
+                '/label',
+            '/div',
+            ['div' => ['class' => 'checkbox']],
+                ['label' => ['for' => 'cat-1']],
+                    ['input' => ['type' => 'checkbox', 'name' => 'category[]', 'value' => '1', 'id' => 'cat-1']],
+                    '2',
+                '/label',
+            '/div',
+        ];
+        $this->assertHtml($expected, $result);
+
+        $result = $this->Form->multiCheckbox(
+            'category',
+            ['1', '2'],
+            ['id' => 'cat']
+        );
         $this->assertHtml($expected, $result);
     }
 
@@ -7662,6 +7740,7 @@ class FormHelperTest extends TestCase
             ->notEmptyString('email', 'Custom error message')
             ->requirePresence('password')
             ->alphaNumeric('password')
+            ->requirePresence('accept_tos')
             ->notBlank('phone');
 
         $table = $this->getTableLocator()->get('Contacts', [
@@ -7729,6 +7808,28 @@ class FormHelperTest extends TestCase
                 'oninput' => 'this.setCustomValidity(&#039;&#039;)',
                 'oninvalid' => 'this.setCustomValidity(&#039;&#039;); if (!this.value) this.setCustomValidity(this.dataset.validityMessage)',
             ],
+        ];
+        $this->assertHtml($expected, $result);
+
+        $result = $this->Form->control('accept_tos', ['type' => 'checkbox']);
+        $expected = [
+            ['input' => ['type' => 'hidden', 'name' => 'accept_tos', 'value' => '0']],
+            'label' => ['for' => 'accept-tos'],
+            [
+                'input' => [
+                    'aria-required' => 'true',
+                    'required' => 'required',
+                    'type' => 'checkbox',
+                    'name' => 'accept_tos',
+                    'id' => 'accept-tos',
+                    'value' => '1',
+                    'data-validity-message' => 'This field cannot be left empty',
+                    'oninput' => 'this.setCustomValidity(&#039;&#039;)',
+                    'oninvalid' => 'this.setCustomValidity(&#039;&#039;); if (!this.checked) this.setCustomValidity(this.dataset.validityMessage)',
+                ],
+            ],
+            'Accept Tos',
+            '/label',
         ];
         $this->assertHtml($expected, $result);
     }

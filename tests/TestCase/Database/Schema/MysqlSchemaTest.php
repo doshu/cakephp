@@ -24,6 +24,7 @@ use Cake\Database\Schema\MysqlSchemaDialect;
 use Cake\Database\Schema\TableSchema;
 use Cake\Datasource\ConnectionManager;
 use Cake\TestSuite\TestCase;
+use Exception;
 use PDO;
 
 /**
@@ -413,9 +414,12 @@ SQL;
             ],
         ];
 
-        if (ConnectionManager::get('test')->getDriver()->isMariadb()) {
+        $driver = ConnectionManager::get('test')->getDriver();
+        if ($driver->isMariaDb()) {
             $expected['created_with_precision']['default'] = 'current_timestamp(3)';
             $expected['created_with_precision']['comment'] = '';
+        }
+        if ($driver->isMariaDb() || version_compare($driver->version(), '8.0.30', '>=')) {
             $expected['title']['collate'] = 'utf8mb3_general_ci';
             $expected['body']['collate'] = 'utf8mb3_general_ci';
         }
@@ -481,6 +485,74 @@ SQL;
             'length' => [],
         ];
         $this->assertEquals($expected, $result->getIndex('author_idx'));
+    }
+
+    /**
+     * Test describing a table with conditional constraints
+     */
+    public function testDescribeTableConditionalConstraint(): void
+    {
+        $connection = ConnectionManager::get('test');
+        $connection->execute('DROP TABLE IF EXISTS conditional_constraint');
+        $table = <<<SQL
+CREATE TABLE conditional_constraint (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    config_id INT UNSIGNED NOT NULL,
+    status ENUM ('new', 'processing', 'completed', 'failed') DEFAULT 'new' NOT NULL,
+    CONSTRAINT unique_index UNIQUE (config_id, (
+        (CASE WHEN ((`status` = "new") OR (`status` = "processing")) THEN `status` END)
+    ))
+);
+SQL;
+        try {
+            $connection->execute($table);
+        } catch (Exception $e) {
+            $this->markTestSkipped('Could not create table with conditional constraint');
+        }
+        $schema = new SchemaCollection($connection);
+        $result = $schema->describe('conditional_constraint');
+        $connection->execute('DROP TABLE IF EXISTS conditional_constraint');
+
+        $constraint = $result->getConstraint('unique_index');
+        $this->assertNotEmpty($constraint);
+        $this->assertEquals('unique', $constraint['type']);
+        $this->assertEquals(['config_id'], $constraint['columns']);
+    }
+
+    public function testDescribeTableFunctionalIndex(): void
+    {
+        $connection = ConnectionManager::get('test');
+        $connection->execute('DROP TABLE IF EXISTS functional_index');
+        $table = <<<SQL
+CREATE TABLE functional_index (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    properties JSON,
+    child_ids VARCHAR(400) GENERATED ALWAYS AS (
+        properties->>'$.children[*].id'
+    ) VIRTUAL
+);
+SQL;
+        $index = <<<SQL
+CREATE INDEX child_ids_idx ON functional_index ((CAST(child_ids AS UNSIGNED ARRAY)));
+SQL;
+        try {
+            $connection->execute($table);
+            $connection->execute($index);
+        } catch (Exception $e) {
+            $this->markTestSkipped('Could not create table with functional index');
+        }
+        $schema = new SchemaCollection($connection);
+        $result = $schema->describe('functional_index');
+        $connection->execute('DROP TABLE IF EXISTS functional_index');
+
+        $column = $result->getColumn('child_ids');
+        $this->assertNotEmpty($column, 'Virtual property column should be reflected');
+        $this->assertEquals('string', $column['type']);
+
+        $index = $result->getIndex('child_ids_idx');
+        $this->assertNotEmpty($index);
+        $this->assertEquals('index', $index['type']);
+        $this->assertEquals([], $index['columns']);
     }
 
     /**

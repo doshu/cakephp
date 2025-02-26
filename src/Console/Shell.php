@@ -31,6 +31,7 @@ use Cake\Utility\Text;
 use ReflectionException;
 use ReflectionMethod;
 use RuntimeException;
+use function Cake\Core\namespaceSplit;
 
 /**
  * Base class for command-line utilities for automating programmer chores.
@@ -137,7 +138,7 @@ class Shell
      * Contains tasks to load and instantiate
      *
      * @var array|bool
-     * @link https://book.cakephp.org/4/en/console-and-shells.html#Shell::$tasks
+     * @link https://book.cakephp.org/4/en/console-commands/shells.html#shell-tasks
      */
     public $tasks = [];
 
@@ -181,7 +182,7 @@ class Shell
      *
      * @param \Cake\Console\ConsoleIo|null $io An io instance.
      * @param \Cake\ORM\Locator\LocatorInterface|null $locator Table locator instance.
-     * @link https://book.cakephp.org/4/en/console-and-shells.html#Shell
+     * @link https://book.cakephp.org/4/en/console-commands/shells.html
      */
     public function __construct(?ConsoleIo $io = null, ?LocatorInterface $locator = null)
     {
@@ -719,7 +720,7 @@ class Shell
     }
 
     /**
-     * Convenience method for out() that wraps message between <info /> tag
+     * Convenience method for out() that wraps message between <info> tag
      *
      * @param array<string>|string $message A string or an array of strings to output
      * @param int $newlines Number of newlines to append
@@ -733,7 +734,7 @@ class Shell
     }
 
     /**
-     * Convenience method for err() that wraps message between <warning /> tag
+     * Convenience method for err() that wraps message between <warning> tag
      *
      * @param array<string>|string $message A string or an array of strings to output
      * @param int $newlines Number of newlines to append
@@ -746,7 +747,7 @@ class Shell
     }
 
     /**
-     * Convenience method for out() that wraps message between <success /> tag
+     * Convenience method for out() that wraps message between <success> tag
      *
      * @param array<string>|string $message A string or an array of strings to output
      * @param int $newlines Number of newlines to append

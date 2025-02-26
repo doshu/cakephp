@@ -16,6 +16,7 @@ declare(strict_types=1);
  */
 namespace Cake\Test\TestCase\Database\Type;
 
+use Cake\Chronos\ChronosDate;
 use Cake\Core\Configure;
 use Cake\Database\Type\DateTimeType;
 use Cake\I18n\FrozenTime;
@@ -46,6 +47,11 @@ class DateTimeTypeTest extends TestCase
     protected $_originalMap = [];
 
     /**
+     * @var string
+     */
+    protected $originalTimeZone;
+
+    /**
      * Setup
      */
     public function setUp(): void
@@ -59,6 +65,18 @@ class DateTimeTypeTest extends TestCase
             'src/I18n/Time.php',
             'tests/TestCase/Database/Type/DateTimeTypeTest.php',
         ]);
+        $this->originalTimeZone = date_default_timezone_get();
+    }
+
+    /**
+     * Reset timezone to its initial value
+     *
+     * @return void
+     */
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+        date_default_timezone_set($this->originalTimeZone);
     }
 
     /**
@@ -113,11 +131,13 @@ class DateTimeTypeTest extends TestCase
     {
         $values = [
             'a' => null,
-            'b' => '2001-01-04 12:13:14',
+            'b' => 978610394,
+            'c' => '2001-01-04 12:13:14',
         ];
         $expected = [
             'a' => null,
             'b' => new Time('2001-01-04 12:13:14'),
+            'c' => new Time('2001-01-04 12:13:14'),
         ];
         $this->assertEquals(
             $expected,
@@ -311,6 +331,18 @@ class DateTimeTypeTest extends TestCase
     }
 
     /**
+     * test marshalling data with different timezone
+     */
+    public function testMarshalWithTimezone(): void
+    {
+        date_default_timezone_set('Europe/Vienna');
+        $value = Time::now();
+        $expected = Time::now();
+        $result = $this->type->marshal($value);
+        $this->assertEquals($expected, $result);
+    }
+
+    /**
      * Test that the marhsalled datetime instance always has the system's default timezone.
      */
     public function testMarshalDateTimeInstance(): void
@@ -408,5 +440,17 @@ class DateTimeTypeTest extends TestCase
         $this->type->useMutable();
         $this->assertInstanceOf('DateTime', $this->type->marshal('2015-11-01 11:23:00'));
         $this->assertInstanceOf('DateTime', $this->type->toPHP('2015-11-01 11:23:00', $this->driver));
+    }
+
+    /**
+     * Test marshaling date into datetime type
+     */
+    public function testMarshalDateWithTimezone(): void
+    {
+        date_default_timezone_set('Europe/Vienna');
+        $value = new ChronosDate('2023-04-26');
+
+        $result = $this->type->marshal($value);
+        $this->assertEquals($value, $result);
     }
 }

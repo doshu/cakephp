@@ -373,4 +373,55 @@ class I18nExtractCommandTest extends TestCase
         $expected = '#: ./tests/test_app/templates/Pages/extract.php:';
         $this->assertStringContainsString($expected, $result);
     }
+
+    /**
+     * test invalid path options
+     */
+    public function testExtractWithInvalidPaths(): void
+    {
+        $this->exec(
+            'i18n extract ' .
+            '--extract-core=no ' .
+            '--paths=' . TEST_APP . 'templates,' . TEST_APP . 'unknown ' .
+            '--output=' . $this->path . DS
+        );
+        $this->assertExitSuccess();
+        $this->assertFileExists($this->path . DS . 'default.pot');
+        $result = file_get_contents($this->path . DS . 'default.pot');
+
+        $expected = '#: ./tests/test_app/templates/Pages/extract.php:';
+        $this->assertStringContainsString($expected, $result);
+    }
+
+    /**
+     * Test with associative arrays in App.path.locales and App.path.templates.
+     */
+    public function testExtractWithAssociativePaths(): void
+    {
+        Configure::write('App.paths', [
+            'plugins' => ['customKey' => TEST_APP . 'Plugin' . DS],
+            'templates' => ['customKey' => TEST_APP . 'templates' . DS],
+            'locales' => ['customKey' => TEST_APP . 'resources' . DS . 'locales' . DS],
+        ]);
+
+        $this->exec(
+            'i18n extract ' .
+            '--merge=no ' .
+            '--extract-core=no ',
+            [
+                // Sending two empty inputs so \Cake\Command\I18nExtractCommand::_getPaths()
+                // loops through all paths
+                '',
+                '',
+                'D',
+                $this->path . DS,
+            ]
+        );
+        $this->assertExitSuccess();
+        $this->assertFileExists($this->path . DS . 'default.pot');
+        $result = file_get_contents($this->path . DS . 'default.pot');
+
+        $expected = '#: ./tests/test_app/templates/Pages/extract.php:';
+        $this->assertStringContainsString($expected, $result);
+    }
 }

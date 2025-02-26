@@ -46,14 +46,14 @@ class BehaviorRegistry extends ObjectRegistry implements EventDispatcherInterfac
     /**
      * Method mappings.
      *
-     * @var array
+     * @var array<string, array>
      */
     protected $_methodMap = [];
 
     /**
      * Finder method mappings.
      *
-     * @var array
+     * @var array<string, array>
      */
     protected $_finderMap = [];
 
@@ -201,6 +201,31 @@ class BehaviorRegistry extends ObjectRegistry implements EventDispatcherInterfac
         }
 
         return compact('methods', 'finders');
+    }
+
+    /**
+     * Remove an object from the registry.
+     *
+     * If this registry has an event manager, the object will be detached from any events as well.
+     *
+     * @param string $name The name of the object to remove from the registry.
+     * @return $this
+     */
+    public function unload(string $name)
+    {
+        $instance = $this->get($name);
+        $result = parent::unload($name);
+
+        $methods = array_change_key_case($instance->implementedMethods());
+        foreach (array_keys($methods) as $method) {
+            unset($this->_methodMap[$method]);
+        }
+        $finders = array_change_key_case($instance->implementedFinders());
+        foreach (array_keys($finders) as $finder) {
+            unset($this->_finderMap[$finder]);
+        }
+
+        return $result;
     }
 
     /**

@@ -18,7 +18,9 @@ namespace TestApp\Controller;
 
 use Cake\Event\EventInterface;
 use Cake\Http\Cookie\Cookie;
+use Cake\Http\Exception\RedirectException;
 use OutOfBoundsException;
+use RuntimeException;
 
 /**
  * PostsController class
@@ -164,7 +166,7 @@ class PostsController extends AppController
     {
         $data = [
             'host' => $this->request->host(),
-            'isSsl' => $this->request->is('ssl'),
+            'isSsl' => $this->request->is('https'),
         ];
 
         return $this->getResponse()->withStringBody(json_encode($data));
@@ -188,6 +190,21 @@ class PostsController extends AppController
             ->withStringBody('ok');
     }
 
+    public function redirectWithCookie()
+    {
+        $cookies = [
+            Cookie::create('remember', '1'),
+            Cookie::create('expired', '')->withExpired(),
+        ];
+        $values = [];
+        foreach ($cookies as $cookie) {
+            $values[] = $cookie->toHeaderValue();
+        }
+        $headers = ['Set-Cookie' => $values];
+
+        throw new RedirectException('/posts', 302, $headers);
+    }
+
     /**
      * @return \Cake\Http\Response
      */
@@ -208,5 +225,14 @@ class PostsController extends AppController
     {
         $this->Flash->error('Error 1');
         throw new OutOfBoundsException('oh no!');
+    }
+
+    /**
+     * @return \Cake\Http\Response
+     */
+    public function throw_chained()
+    {
+        $inner = new RuntimeException('inner badness');
+        throw new OutOfBoundsException('oh no!', 1, $inner);
     }
 }

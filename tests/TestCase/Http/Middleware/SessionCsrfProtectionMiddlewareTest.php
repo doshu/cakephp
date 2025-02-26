@@ -2,17 +2,17 @@
 declare(strict_types=1);
 
 /**
- * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
- * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
+ * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
  *
  * Licensed under The MIT License
  * For full copyright and license information, please see the LICENSE.txt
  * Redistributions of files must retain the above copyright notice.
  *
- * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
- * @link          http://cakephp.org CakePHP(tm) Project
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
+ * @link          https://cakephp.org CakePHP(tm) Project
  * @since         4.2.0
- * @license       http://www.opensource.org/licenses/mit-license.php MIT License
+ * @license       https://www.opensource.org/licenses/mit-license.php MIT License
  */
 namespace Cake\Test\TestCase\Http\Middleware;
 
@@ -412,5 +412,28 @@ class SessionCsrfProtectionMiddlewareTest extends TestCase
             $results[] = $middleware->saltToken($token);
         }
         $this->assertCount(10, array_unique($results));
+    }
+
+    /**
+     * Ensure that tokens can be regenerated
+     */
+    public function testRegenerateToken(): void
+    {
+        $request = new ServerRequest([
+            'url' => '/articles/',
+        ]);
+        $updated = SessionCsrfProtectionMiddleware::replaceToken($request);
+        $this->assertNotSame($request, $updated);
+
+        $session = $updated->getSession()->read('csrfToken');
+        $this->assertNotEmpty($session);
+        $attribute = $updated->getAttribute('csrfToken');
+        $this->assertNotEmpty($attribute);
+        $this->assertNotEquals($session, $attribute, 'Should not be equal because of salting');
+
+        $updated = SessionCsrfProtectionMiddleware::replaceToken($request, 'custom-key');
+        $this->assertNotSame($request, $updated);
+        $this->assertNotEmpty($updated->getSession()->read('custom-key'));
+        $this->assertNotEmpty($updated->getAttribute('custom-key'));
     }
 }

@@ -24,12 +24,16 @@ use Cake\ORM\Table;
 use Cake\Utility\Inflector;
 use Closure;
 use RuntimeException;
+use function Cake\Core\pluginSplit;
 
 /**
  * Represents an 1 - N relationship where the source side of the relation is
  * related to only one record in the target table.
  *
  * An example of a BelongsTo association would be Article belongs to Author.
+ *
+ * @template T of \Cake\ORM\Table
+ * @mixin T
  */
 class BelongsTo extends Association
 {

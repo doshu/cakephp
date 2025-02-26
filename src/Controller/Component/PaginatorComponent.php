@@ -24,6 +24,7 @@ use Cake\Datasource\ResultSetInterface;
 use Cake\Http\Exception\NotFoundException;
 use InvalidArgumentException;
 use UnexpectedValueException;
+use function Cake\Core\deprecationWarning;
 
 /**
  * This component is used to handle automatic model data pagination. The primary way to use this
@@ -99,7 +100,7 @@ class PaginatorComponent extends Component
      * These settings are used to build the queries made and control other pagination settings.
      *
      * If your settings contain a key with the current table's alias. The data inside that key will be used.
-     * Otherwise the top level configuration will be used.
+     * Otherwise, the top level configuration will be used.
      *
      * ```
      *  $settings = [

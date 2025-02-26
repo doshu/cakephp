@@ -30,9 +30,9 @@ use function Laminas\Diactoros\normalizeUploadedFiles;
 /**
  * Factory for making ServerRequest instances.
  *
- * This subclass adds in CakePHP specific behavior to populate
- * the basePath and webroot attributes. Furthermore the Uri's path
- * is corrected to only contain the 'virtual' path for the request.
+ * This adds in CakePHP specific behavior to populate the basePath and webroot
+ * attributes. Furthermore the Uri's path is corrected to only contain the
+ * 'virtual' path for the request.
  */
 abstract class ServerRequestFactory implements ServerRequestFactoryInterface
 {
@@ -42,10 +42,6 @@ abstract class ServerRequestFactory implements ServerRequestFactoryInterface
      * If any argument is not supplied, the corresponding superglobal value will
      * be used.
      *
-     * The ServerRequest created is then passed to the fromServer() method in
-     * order to marshal the request URI and headers.
-     *
-     * @see fromServer()
      * @param array|null $server $_SERVER superglobal
      * @param array|null $query $_GET superglobal
      * @param array|null $parsedBody $_POST superglobal
@@ -75,7 +71,6 @@ abstract class ServerRequestFactory implements ServerRequestFactoryInterface
             $uri->getUri();
         }
 
-        /** @psalm-suppress NoInterfaceProperties */
         $sessionConfig = (array)Configure::read('Session') + [
             'defaults' => 'php',
             'cookiePath' => $webroot,
@@ -94,6 +89,12 @@ abstract class ServerRequestFactory implements ServerRequestFactoryInterface
         ]);
 
         $request = static::marshalBodyAndRequestMethod($parsedBody ?? $_POST, $request);
+        // This is required as `ServerRequest::scheme()` ignores the value of
+        // `HTTP_X_FORWARDED_PROTO` unless `trustProxy` is enabled, while the
+        // `Uri` instance intially created always takes values of `HTTP_X_FORWARDED_PROTO`
+        // into account.
+        $uri = $request->getUri()->withScheme($request->scheme());
+        $request = $request->withUri($uri, true);
 
         return static::marshalFiles($files ?? $_FILES, $request);
     }
@@ -246,14 +247,7 @@ abstract class ServerRequestFactory implements ServerRequestFactoryInterface
         $uri = marshalUriFromSapi($server, $headers);
         [$base, $webroot] = static::getBase($uri, $server);
 
-        // Look in PATH_INFO first, as this is the exact value we need prepared
-        // by PHP.
-        $pathInfo = Hash::get($server, 'PATH_INFO');
-        if ($pathInfo) {
-            $uri = $uri->withPath($pathInfo);
-        } else {
-            $uri = static::updatePath($base, $uri);
-        }
+        $uri = static::updatePath($base, $uri);
 
         if (!$uri->getHost()) {
             $uri = $uri->withHost('localhost');
@@ -281,12 +275,18 @@ abstract class ServerRequestFactory implements ServerRequestFactoryInterface
         if (empty($path) || $path === '/' || $path === '//' || $path === '/index.php') {
             $path = '/';
         }
-        $endsWithIndex = '/' . (Configure::read('App.webroot') ?: 'webroot') . '/index.php';
-        $endsWithLength = strlen($endsWithIndex);
-        if (
-            strlen($path) >= $endsWithLength &&
-            substr($path, -$endsWithLength) === $endsWithIndex
-        ) {
+        // Check for $webroot/index.php at the start and end of the path.
+        $search = '';
+        if ($path[0] === '/') {
+            $search .= '/';
+        }
+        $search .= (Configure::read('App.webroot') ?: 'webroot') . '/index.php';
+        if (strpos($path, $search) === 0) {
+            $path = substr($path, strlen($search));
+        } elseif (substr($path, -strlen($search)) === $search) {
+            $path = '/';
+        }
+        if (!$path) {
             $path = '/';
         }
 
@@ -320,9 +320,9 @@ abstract class ServerRequestFactory implements ServerRequestFactoryInterface
             // Clean up additional / which cause following code to fail..
             $base = preg_replace('#/+#', '/', $base);
 
-            $indexPos = strpos($base, '/' . $webroot . '/index.php');
+            $indexPos = strpos($base, '/index.php');
             if ($indexPos !== false) {
-                $base = substr($base, 0, $indexPos) . '/' . $webroot;
+                $base = substr($base, 0, $indexPos);
             }
             if ($webroot === basename($base)) {
                 $base = dirname($base);

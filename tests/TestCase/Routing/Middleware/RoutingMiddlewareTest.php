@@ -17,7 +17,7 @@ declare(strict_types=1);
 namespace Cake\Test\TestCase\Routing\Middleware;
 
 use Cake\Cache\Cache;
-use Cake\Cache\InvalidArgumentException as CacheInvalidArgumentException;
+use Cake\Cache\Exception\InvalidArgumentException as CacheInvalidArgumentException;
 use Cake\Core\Configure;
 use Cake\Core\HttpApplicationInterface;
 use Cake\Http\ServerRequestFactory;
@@ -28,12 +28,14 @@ use Cake\Routing\Route\Route;
 use Cake\Routing\RouteBuilder;
 use Cake\Routing\RouteCollection;
 use Cake\Routing\Router;
+use Cake\Routing\RoutingApplicationInterface;
 use Cake\TestSuite\TestCase;
 use Laminas\Diactoros\Response;
 use TestApp\Application;
 use TestApp\Http\TestRequestHandler;
 use TestApp\Middleware\DumbMiddleware;
 use TestApp\Middleware\UnserializableMiddleware;
+use TestApp\Routing\Route\HeaderRedirectRoute;
 
 /**
  * Test for RoutingMiddleware
@@ -95,18 +97,17 @@ class RoutingMiddlewareTest extends TestCase
      */
     public function testRedirectResponseWithHeaders(): void
     {
-        $this->builder->scope('/', function (RouteBuilder $routes): void {
-            $routes->redirect('/testpath', '/pages');
-        });
+        $this->builder->connect('/testpath', ['controller' => 'Articles', 'action' => 'index'], ['routeClass' => HeaderRedirectRoute::class]);
         $request = ServerRequestFactory::fromGlobals(['REQUEST_URI' => '/testpath']);
         $handler = new TestRequestHandler(function ($request) {
-            return new Response('php://memory', 200, ['X-testing' => 'Yes']);
+            return new Response();
         });
         $middleware = new RoutingMiddleware($this->app());
         $response = $middleware->process($request, $handler);
 
         $this->assertSame(301, $response->getStatusCode());
         $this->assertSame('http://localhost/pages', $response->getHeaderLine('Location'));
+        $this->assertSame('yes', $response->getHeaderLine('Redirect-Exception'));
     }
 
     /**
@@ -573,6 +574,43 @@ class RoutingMiddlewareTest extends TestCase
         $this->expectExceptionMessage('Unable to cache route collection.');
         $middleware->process($request, new TestRequestHandler());
         Configure::delete('Error.ignoredDeprecationPaths');
+    }
+
+    /**
+     * Test middleware works without an application implementing ContainerApplicationInterface
+     */
+    public function testAppWithoutContainerApplicationInterface(): void
+    {
+        /** @var \Cake\Core\HttpApplicationInterface|\PHPUnit\Framework\MockObject\MockObject $app */
+        $app = $this->createMock(RoutingApplicationInterface::class);
+        $this->builder->scope('/', function (RouteBuilder $routes): void {
+            $routes->connect('/testpath', ['controller' => 'Articles', 'action' => 'index']);
+        });
+        $request = ServerRequestFactory::fromGlobals(['REQUEST_URI' => '/testpath']);
+        $handler = new TestRequestHandler(function ($request) {
+            return new Response('php://memory', 200);
+        });
+        $middleware = new RoutingMiddleware($app);
+        $response = $middleware->process($request, $handler);
+        $this->assertSame(200, $response->getStatusCode());
+    }
+
+    /**
+     * Test middleware works with an application implementing ContainerApplicationInterface
+     */
+    public function testAppWithContainerApplicationInterface(): void
+    {
+        $app = $this->app();
+        $this->builder->scope('/', function (RouteBuilder $routes): void {
+            $routes->connect('/testpath', ['controller' => 'Articles', 'action' => 'index']);
+        });
+        $request = ServerRequestFactory::fromGlobals(['REQUEST_URI' => '/testpath']);
+        $handler = new TestRequestHandler(function ($request) {
+            return new Response('php://memory', 200);
+        });
+        $middleware = new RoutingMiddleware($app);
+        $response = $middleware->process($request, $handler);
+        $this->assertSame(200, $response->getStatusCode());
     }
 
     /**

@@ -16,11 +16,10 @@ declare(strict_types=1);
  */
 namespace Cake\Test\TestCase\View\Helper;
 
-use Cake\Core\Configure;
 use Cake\TestSuite\TestCase;
 use Cake\View\Helper\TextHelper;
 use Cake\View\View;
-use TestApp\Utility\TestAppEngine;
+use TestApp\Utility\TestAppUtilityEngine;
 use TestApp\Utility\TextMock;
 use TestApp\View\Helper\TextHelperTestObject;
 use TestPlugin\Utility\TestPluginEngine;
@@ -41,11 +40,6 @@ class TextHelperTest extends TestCase
     protected $View;
 
     /**
-     * @var string
-     */
-    protected $appNamespace;
-
-    /**
      * setUp method
      */
     public function setUp(): void
@@ -53,8 +47,6 @@ class TextHelperTest extends TestCase
         parent::setUp();
         $this->View = new View();
         $this->Text = new TextHelper($this->View);
-
-        $this->appNamespace = Configure::read('App.namespace');
         static::setAppNamespace();
     }
 
@@ -64,7 +56,6 @@ class TextHelperTest extends TestCase
     public function tearDown(): void
     {
         unset($this->Text, $this->View);
-        static::setAppNamespace($this->appNamespace);
         parent::tearDown();
     }
 
@@ -73,57 +64,59 @@ class TextHelperTest extends TestCase
      */
     public function testTextHelperProxyMethodCalls(): void
     {
-        $methods = [
-            'stripLinks', 'toList',
-        ];
-        $String = $this->getMockBuilder(TextMock::class)
-            ->addMethods($methods)
-            ->getMock();
-        $Text = new TextHelperTestObject($this->View, ['engine' => TextMock::class]);
-        $Text->attach($String);
-        foreach ($methods as $method) {
-            $String->expects($this->once())->method($method)->willReturn('');
-            $Text->{$method}(['who'], 'what', 'when', 'where', 'how');
-        }
+        $this->deprecated(function () {
+            $methods = [
+                'stripLinks', 'toList',
+            ];
+            $String = $this->getMockBuilder(TextMock::class)
+                ->addMethods($methods)
+                ->getMock();
+            $Text = new TextHelperTestObject($this->View, ['engine' => TextMock::class]);
+            $Text->attach($String);
+            foreach ($methods as $method) {
+                $String->expects($this->once())->method($method)->willReturn('');
+                $Text->{$method}(['who'], 'what', 'when', 'where', 'how');
+            }
 
-        $methods = [
-            'excerpt',
-        ];
-        $String = $this->getMockBuilder(TextMock::class)
-            ->addMethods($methods)
-            ->getMock();
-        $Text = new TextHelperTestObject($this->View, ['engine' => TextMock::class]);
-        $Text->attach($String);
-        foreach ($methods as $method) {
-            $String->expects($this->once())->method($method)->willReturn('');
-            $Text->{$method}('who', 'what');
-        }
+            $methods = [
+                'excerpt',
+            ];
+            $String = $this->getMockBuilder(TextMock::class)
+                ->addMethods($methods)
+                ->getMock();
+            $Text = new TextHelperTestObject($this->View, ['engine' => TextMock::class]);
+            $Text->attach($String);
+            foreach ($methods as $method) {
+                $String->expects($this->once())->method($method)->willReturn('');
+                $Text->{$method}('who', 'what');
+            }
 
-        $methods = [
-            'highlight',
-        ];
-        $String = $this->getMockBuilder(TextMock::class)
-            ->addMethods($methods)
-            ->getMock();
-        $Text = new TextHelperTestObject($this->View, ['engine' => TextMock::class]);
-        $Text->attach($String);
-        foreach ($methods as $method) {
-            $String->expects($this->once())->method($method)->willReturn('');
-            $Text->{$method}('who', 'what');
-        }
+            $methods = [
+                'highlight',
+            ];
+            $String = $this->getMockBuilder(TextMock::class)
+                ->addMethods($methods)
+                ->getMock();
+            $Text = new TextHelperTestObject($this->View, ['engine' => TextMock::class]);
+            $Text->attach($String);
+            foreach ($methods as $method) {
+                $String->expects($this->once())->method($method)->willReturn('');
+                $Text->{$method}('who', 'what');
+            }
 
-        $methods = [
-            'tail', 'truncate',
-        ];
-        $String = $this->getMockBuilder(TextMock::class)
-            ->addMethods($methods)
-            ->getMock();
-        $Text = new TextHelperTestObject($this->View, ['engine' => TextMock::class]);
-        $Text->attach($String);
-        foreach ($methods as $method) {
-            $String->expects($this->once())->method($method)->willReturn('');
-            $Text->{$method}('who', 1, ['what']);
-        }
+            $methods = [
+                'tail', 'truncate',
+            ];
+            $String = $this->getMockBuilder(TextMock::class)
+                ->addMethods($methods)
+                ->getMock();
+            $Text = new TextHelperTestObject($this->View, ['engine' => TextMock::class]);
+            $Text->attach($String);
+            foreach ($methods as $method) {
+                $String->expects($this->once())->method($method)->willReturn('');
+                $Text->{$method}('who', 1, ['what']);
+            }
+        });
     }
 
     /**
@@ -131,13 +124,15 @@ class TextHelperTest extends TestCase
      */
     public function testEngineOverride(): void
     {
-        $Text = new TextHelperTestObject($this->View, ['engine' => 'TestAppEngine']);
-        $this->assertInstanceOf(TestAppEngine::class, $Text->engine());
+        $this->deprecated(function () {
+            $Text = new TextHelperTestObject($this->View, ['engine' => 'TestAppUtilityEngine']);
+            $this->assertInstanceOf(TestAppUtilityEngine::class, $Text->engine());
 
-        $this->loadPlugins(['TestPlugin']);
-        $Text = new TextHelperTestObject($this->View, ['engine' => 'TestPlugin.TestPluginEngine']);
-        $this->assertInstanceOf(TestPluginEngine::class, $Text->engine());
-        $this->clearPlugins();
+            $this->loadPlugins(['TestPlugin']);
+            $Text = new TextHelperTestObject($this->View, ['engine' => 'TestPlugin.TestPluginEngine']);
+            $this->assertInstanceOf(TestPluginEngine::class, $Text->engine());
+            $this->clearPlugins();
+        });
     }
 
     /**

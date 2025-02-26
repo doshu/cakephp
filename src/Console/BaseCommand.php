@@ -21,6 +21,7 @@ use Cake\Console\Exception\StopException;
 use Cake\Utility\Inflector;
 use InvalidArgumentException;
 use RuntimeException;
+use function Cake\Core\getTypeName;
 
 /**
  * Base class for console commands.
@@ -238,11 +239,12 @@ abstract class BaseCommand implements CommandInterface
     abstract public function execute(Arguments $args, ConsoleIo $io);
 
     /**
-     * Halt the the current process with a StopException.
+     * Halt the current process with a StopException.
      *
      * @param int $code The exit code to use.
      * @throws \Cake\Console\Exception\StopException
      * @return void
+     * @psalm-return never-return
      */
     public function abort(int $code = self::CODE_ERROR): void
     {

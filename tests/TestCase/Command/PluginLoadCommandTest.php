@@ -83,6 +83,51 @@ class PluginLoadCommandTest extends TestCase
     }
 
     /**
+     * Test loading a plugin twice prevents it being added twice
+     */
+    public function testPreventDuplicatePluginLoad(): void
+    {
+        $this->exec('plugin load TestPlugin');
+        $this->assertExitCode(Command::CODE_SUCCESS);
+
+        $contents = file_get_contents($this->app);
+        $this->assertMatchesRegularExpression('/Check plugins added here\n {8}\$this->addPlugin\(\'TestPlugin\'\);\n {4}\}\n/u', $contents);
+
+        $this->exec('plugin load TestPlugin');
+        $this->assertExitCode(Command::CODE_SUCCESS);
+        $this->assertOutputContains('The specified plugin is already loaded!');
+
+        $this->exec('plugin load Company/TestPluginThree');
+        $this->assertExitCode(Command::CODE_SUCCESS);
+
+        $contents = file_get_contents($this->app);
+        $this->assertMatchesRegularExpression('#\$this->addPlugin\(\'Company/TestPluginThree\'\);\n {4}\}\n#u', $contents);
+
+        $this->exec('plugin load Company/TestPluginThree');
+        $this->assertExitCode(Command::CODE_SUCCESS);
+        $this->assertOutputContains('The specified plugin is already loaded!');
+    }
+
+    /**
+     * Test loading a plugin twice prevents it being added twice if it has config
+     */
+    public function testPreventDuplicatePluginLoadWithConfig(): void
+    {
+        $this->exec('plugin load TestPlugin');
+        $this->assertExitCode(Command::CODE_SUCCESS);
+
+        $contents = file_get_contents($this->app);
+        $this->assertMatchesRegularExpression('/Check plugins added here\n {8}\$this->addPlugin\(\'TestPlugin\'\);\n {4}\}\n/u', $contents);
+
+        $contents = str_replace("->addPlugin('TestPlugin')", "->addPlugin('TestPlugin', ['bootstrap' => false])", $contents);
+        file_put_contents($this->app, $contents);
+
+        $this->exec('plugin load TestPlugin');
+        $this->assertExitCode(Command::CODE_SUCCESS);
+        $this->assertOutputContains('The specified plugin is already loaded!');
+    }
+
+    /**
      * Test loading an unknown plugin
      */
     public function testLoadUnknownPlugin(): void

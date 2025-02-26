@@ -2,17 +2,17 @@
 declare(strict_types=1);
 
 /**
- * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
- * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
+ * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
  *
  * Licensed under The MIT License
  * For full copyright and license information, please see the LICENSE.txt
  * Redistributions of files must retain the above copyright notice.
  *
- * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
- * @link          http://cakephp.org CakePHP(tm) Project
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
+ * @link          https://cakephp.org CakePHP(tm) Project
  * @since         3.5.0
- * @license       http://www.opensource.org/licenses/mit-license.php MIT License
+ * @license       https://www.opensource.org/licenses/mit-license.php MIT License
  */
 namespace Cake\Test\TestCase\Http\Middleware;
 
@@ -106,12 +106,42 @@ class CsrfProtectionMiddlewareTest extends TestCase
         $this->assertNotEmpty($cookie, 'Should set a token.');
         $this->assertMatchesRegularExpression('/^[a-z0-9\/+]+={0,2}$/i', $cookie['value'], 'Should look like base64.');
         $this->assertSame(0, $cookie['expires'], 'session duration.');
+        $this->assertFalse($cookie['secure']);
+        $this->assertFalse($cookie['httponly']);
         $this->assertSame('/dir/', $cookie['path'], 'session path.');
         $requestAttr = $updatedRequest->getAttribute('csrfToken');
 
         $this->assertNotEquals($cookie['value'], $requestAttr);
         $this->assertEquals(strlen($cookie['value']) * 2, strlen($requestAttr));
         $this->assertMatchesRegularExpression('/^[A-Z0-9\/+]+=*$/i', $requestAttr);
+    }
+
+    public function testSettingCookieWithCustomOptions(): void
+    {
+        $request = new ServerRequest([
+            'environment' => ['REQUEST_METHOD' => 'GET'],
+            'webroot' => '/',
+        ]);
+
+        /** @var \Cake\Http\ServerRequest $updatedRequest */
+        $updatedRequest = null;
+        $handler = new TestRequestHandler(function ($request) use (&$updatedRequest) {
+            $updatedRequest = $request;
+
+            return new Response();
+        });
+
+        $middleware = new CsrfProtectionMiddleware([
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => CookieInterface::SAMESITE_LAX,
+        ]);
+        $response = $middleware->process($request, $handler);
+
+        $cookie = $response->getCookie('csrfToken');
+        $this->assertTrue($cookie['secure']);
+        $this->assertTrue($cookie['httponly']);
+        $this->assertSame(CookieInterface::SAMESITE_LAX, $cookie['samesite']);
     }
 
     /**

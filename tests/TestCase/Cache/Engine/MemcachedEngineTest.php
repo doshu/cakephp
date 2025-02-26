@@ -18,10 +18,11 @@ namespace Cake\Test\TestCase\Cache\Engine;
 
 use Cake\Cache\Cache;
 use Cake\Cache\Engine\MemcachedEngine;
+use Cake\Cache\Exception\InvalidArgumentException;
 use Cake\TestSuite\TestCase;
 use DateInterval;
-use InvalidArgumentException;
 use Memcached;
+use function Cake\Core\env;
 
 /**
  * MemcachedEngineTest class
@@ -813,6 +814,26 @@ class MemcachedEngineTest extends TestCase
 
         $this->assertNull(Cache::read('some_value', 'memcached'));
         $this->assertSame('cache2', Cache::read('some_value', 'memcached2'));
+
+        Cache::clear('memcached2');
+    }
+
+    /**
+     * test clearing memcached with empty prefix.
+     */
+    public function testClearWithEmptyPrefix(): void
+    {
+        Cache::setConfig('memcached2', [
+            'engine' => 'Memcached',
+            'prefix' => '',
+            'duration' => 3600,
+            'servers' => ['127.0.0.1:' . $this->port],
+        ]);
+
+        Cache::write('some_value', 'cache1', 'memcached2');
+        sleep(1);
+        $this->assertTrue(Cache::clear('memcached2'));
+        $this->assertNull(Cache::read('some_value', 'memcached2'));
 
         Cache::clear('memcached2');
     }

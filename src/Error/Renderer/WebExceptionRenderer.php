@@ -44,6 +44,9 @@ use Cake\View\Exception\MissingTemplateException;
 use PDOException;
 use Psr\Http\Message\ResponseInterface;
 use Throwable;
+use function Cake\Core\h;
+use function Cake\Core\namespaceSplit;
+use function Cake\I18n\__d;
 
 /**
  * Web Exception Renderer.
@@ -167,9 +170,17 @@ class WebExceptionRenderer implements ExceptionRendererInterface
             $params['controller'] = 'Error';
 
             $factory = new ControllerFactory(new Container());
+            // Check including plugin + prefix
             $class = $factory->getControllerClass($request->withAttribute('params', $params));
 
+            if (!$class && !empty($params['prefix']) && !empty($params['plugin'])) {
+                unset($params['prefix']);
+                // Fallback to only plugin
+                $class = $factory->getControllerClass($request->withAttribute('params', $params));
+            }
+
             if (!$class) {
+                // Fallback to app/core provided controller.
                 /** @var string $class */
                 $class = App::className('Error', 'Controller', 'Controller');
             }
@@ -248,10 +259,18 @@ class WebExceptionRenderer implements ExceptionRendererInterface
         }
         $response = $response->withStatus($code);
 
+        $exceptions = [$exception];
+        $previous = $exception->getPrevious();
+        while ($previous != null) {
+            $exceptions[] = $previous;
+            $previous = $previous->getPrevious();
+        }
+
         $viewVars = [
             'message' => $message,
             'url' => h($url),
             'error' => $exception,
+            'exceptions' => $exceptions,
             'code' => $code,
         ];
         $serialize = ['message', 'url', 'code'];
@@ -260,7 +279,7 @@ class WebExceptionRenderer implements ExceptionRendererInterface
         if ($isDebug) {
             $trace = (array)Debugger::formatTrace($exception->getTrace(), [
                 'format' => 'array',
-                'args' => false,
+                'args' => true,
             ]);
             $origin = [
                 'file' => $exception->getFile() ?: 'null',

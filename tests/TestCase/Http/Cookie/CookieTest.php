@@ -2,15 +2,15 @@
 declare(strict_types=1);
 
 /**
- * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
- * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * CakePHP(tm) : Rapid Development Framework (https://cakephp.org)
+ * Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
  * Licensed under The MIT License
  * Redistributions of files must retain the above copyright notice.
  *
- * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
- * @link          http://cakephp.org CakePHP(tm) Project
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (https://cakefoundation.org)
+ * @link          https://cakephp.org CakePHP(tm) Project
  * @since         3.5.0
- * @license       http://www.opensource.org/licenses/mit-license.php MIT License
+ * @license       https://www.opensource.org/licenses/mit-license.php MIT License
  */
 namespace Cake\Test\TestCase\Http\Cookie;
 
@@ -237,6 +237,20 @@ class CookieTest extends TestCase
     }
 
     /**
+     * Test the expired method
+     */
+    public function testWithExpiredNotUtc(): void
+    {
+        date_default_timezone_set('Europe/Paris');
+
+        $cookie = new Cookie('cakephp', 'cakephp-rocks');
+        $new = $cookie->withExpired();
+        date_default_timezone_set('UTC');
+
+        $this->assertStringContainsString('01-Jan-1970 00:00:01 GMT+0000', $new->toHeaderValue());
+    }
+
+    /**
      * Test the withExpiry method
      */
     public function testWithExpiry(): void
@@ -451,7 +465,7 @@ class CookieTest extends TestCase
         $this->assertSame('test;example.com;/path', $cookie->getId());
     }
 
-    public function testCreateFromHeaderString(): void
+    public function testCreateFromHeaderStringInvalidSamesite(): void
     {
         $header = 'cakephp=cakephp-rocks; expires=Wed, 01-Dec-2027 12:00:00 GMT; path=/; domain=cakephp.org; samesite=invalid; secure; httponly';
         $result = Cookie::createFromHeaderString($header);
@@ -459,6 +473,15 @@ class CookieTest extends TestCase
         // Ignore invalid value when parsing headers
         // https://tools.ietf.org/html/draft-west-first-party-cookies-07#section-4.1
         $this->assertNull($result->getSameSite());
+    }
+
+    public function testCreateFromHeaderStringEmptyValue(): void
+    {
+        // Invalid cookie with no = separator or value.
+        $header = 'cakephp; expires=Wed, 01-Dec-2027 12:00:00 GMT; path=/; domain=cakephp.org;';
+        $result = Cookie::createFromHeaderString($header);
+
+        $this->assertSame('', $result->getValue());
     }
 
     public function testDefaults(): void
@@ -480,7 +503,7 @@ class CookieTest extends TestCase
         $this->expectExceptionMessage('Invalid type `array` for expire');
 
         Cookie::setDefaults(['expires' => ['ompalompa']]);
-        $cookie = new Cookie('cakephp', 'cakephp-rocks');
+        new Cookie('cakephp', 'cakephp-rocks');
     }
 
     public function testInvalidSameSiteForDefaults(): void

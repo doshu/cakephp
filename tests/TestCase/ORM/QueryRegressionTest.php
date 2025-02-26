@@ -28,6 +28,7 @@ use Cake\TestSuite\TestCase;
 use DateTime as NativeDateTime;
 use InvalidArgumentException;
 use RuntimeException;
+use function Cake\Collection\collection;
 
 /**
  * Contains regression test for the Query builder
@@ -82,9 +83,7 @@ class QueryRegressionTest extends TestCase
     public function testEagerLoadingAliasedAssociationFields(): void
     {
         $table = $this->getTableLocator()->get('Articles');
-        $table->belongsTo('Authors', [
-            'foreignKey' => 'author_id',
-        ]);
+        $table->belongsTo('Authors');
         $result = $table->find()
             ->contain(['Authors' => [
                 'fields' => [
@@ -157,17 +156,9 @@ class QueryRegressionTest extends TestCase
     public function testEagerLoadingNestedMatchingCalls(): void
     {
         $articles = $this->getTableLocator()->get('Articles');
-        $articles->belongsToMany('Tags', [
-            'foreignKey' => 'article_id',
-            'targetForeignKey' => 'tag_id',
-            'joinTable' => 'articles_tags',
-        ]);
+        $articles->belongsToMany('Tags');
         $tags = $this->getTableLocator()->get('Tags');
-        $tags->belongsToMany('Authors', [
-            'foreignKey' => 'tag_id',
-            'targetForeignKey' => 'author_id',
-            'joinTable' => 'authors_tags',
-        ]);
+        $tags->belongsToMany('Authors');
 
         $query = $articles->find()
             ->matching('Tags', function ($q) {
@@ -242,7 +233,6 @@ class QueryRegressionTest extends TestCase
         $articles = $this->getTableLocator()->get('Articles');
         $articles->belongsToMany('Highlights', [
             'className' => 'TestApp\Model\Table\TagsTable',
-            'foreignKey' => 'article_id',
             'targetForeignKey' => 'tag_id',
             'through' => 'SpecialTags',
         ]);
@@ -330,7 +320,6 @@ class QueryRegressionTest extends TestCase
         $articles = $this->getTableLocator()->get('Articles');
         $articles->belongsToMany('Highlights', [
             'className' => 'TestApp\Model\Table\TagsTable',
-            'foreignKey' => 'article_id',
             'targetForeignKey' => 'tag_id',
             'through' => 'SpecialTags',
             'saveStrategy' => $strategy,
@@ -422,7 +411,6 @@ class QueryRegressionTest extends TestCase
         $articles = $this->getTableLocator()->get('Articles');
         $articles->belongsToMany('Highlights', [
             'className' => 'TestApp\Model\Table\TagsTable',
-            'foreignKey' => 'article_id',
             'targetForeignKey' => 'tag_id',
             'through' => 'SpecialTags',
         ]);
@@ -1182,8 +1170,6 @@ class QueryRegressionTest extends TestCase
     {
         $table = $this->getTableLocator()->get('Articles');
         $table->belongsToMany('Tags', [
-            'foreignKey' => 'article_id',
-            'associationForeignKey' => 'tag_id',
             'through' => 'SpecialTags',
         ]);
         $query = $table->find()
@@ -1204,9 +1190,7 @@ class QueryRegressionTest extends TestCase
     public function testComplexTypesInJoinedWhere(): void
     {
         $table = $this->getTableLocator()->get('Users');
-        $table->hasOne('Comments', [
-            'foreignKey' => 'user_id',
-        ]);
+        $table->hasOne('Comments');
         $query = $table->find()
             ->contain('Comments')
             ->where([
@@ -1224,13 +1208,10 @@ class QueryRegressionTest extends TestCase
     public function testComplexNestedTypesInJoinedWhere(): void
     {
         $table = $this->getTableLocator()->get('Users');
-        $table->hasOne('Comments', [
-            'foreignKey' => 'user_id',
-        ]);
+        $table->hasOne('Comments');
         $table->Comments->belongsTo('Articles');
         $table->Comments->Articles->belongsTo('Authors', [
             'className' => 'Users',
-            'foreignKey' => 'author_id',
         ]);
 
         $query = $table->find()
@@ -1250,13 +1231,10 @@ class QueryRegressionTest extends TestCase
     public function testComplexTypesInJoinedWhereWithMatching(): void
     {
         $table = $this->getTableLocator()->get('Users');
-        $table->hasOne('Comments', [
-            'foreignKey' => 'user_id',
-        ]);
+        $table->hasOne('Comments');
         $table->Comments->belongsTo('Articles');
         $table->Comments->Articles->belongsTo('Authors', [
             'className' => 'Users',
-            'foreignKey' => 'author_id',
         ]);
 
         $query = $table->find()
@@ -1308,13 +1286,10 @@ class QueryRegressionTest extends TestCase
     public function testComplexTypesInJoinedWhereWithInnerJoinWith(): void
     {
         $table = $this->getTableLocator()->get('Users');
-        $table->hasOne('Comments', [
-            'foreignKey' => 'user_id',
-        ]);
+        $table->hasOne('Comments');
         $table->Comments->belongsTo('Articles');
         $table->Comments->Articles->belongsTo('Authors', [
             'className' => 'Users',
-            'foreignKey' => 'author_id',
         ]);
 
         $query = $table->find()
@@ -1344,13 +1319,10 @@ class QueryRegressionTest extends TestCase
     public function testComplexTypesInJoinedWhereWithLeftJoinWith(): void
     {
         $table = $this->getTableLocator()->get('Users');
-        $table->hasOne('Comments', [
-            'foreignKey' => 'user_id',
-        ]);
+        $table->hasOne('Comments');
         $table->Comments->belongsTo('Articles');
         $table->Comments->Articles->belongsTo('Authors', [
             'className' => 'Users',
-            'foreignKey' => 'author_id',
         ]);
 
         $query = $table->find()
@@ -1585,8 +1557,7 @@ class QueryRegressionTest extends TestCase
                         ->ABS([
                             $table
                                 ->getConnection()
-                                ->newQuery()
-                                ->select(-1),
+                                ->selectQuery(-1),
                         ])
                         ->setReturnType('integer'),
                 ];
@@ -1641,8 +1612,7 @@ class QueryRegressionTest extends TestCase
                             [
                                 $table
                                     ->getConnection()
-                                    ->newQuery()
-                                    ->select(1.23456),
+                                    ->selectQuery(1.23456),
                                 2,
                             ],
                             [null, 'integer']

@@ -28,6 +28,7 @@ use Cake\Error\Debugger;
 use Cake\Error\Renderer\HtmlErrorRenderer;
 use Cake\Form\Form;
 use Cake\Log\Log;
+use Cake\ORM\Table;
 use Cake\TestSuite\TestCase;
 use InvalidArgumentException;
 use MyClass;
@@ -104,7 +105,10 @@ class DebuggerTest extends TestCase
         $this->assertCount(4, $result);
 
         $this->skipIf(defined('HHVM_VERSION'), 'HHVM does not highlight php code');
-        $pattern = '/<code>.*?<span style\="color\: \#\d+">.*?&lt;\?php/';
+        // Due to different highlight_string() function behavior, see. https://3v4l.org/HcfBN. Since 8.3, it wraps it around <pre>
+        $pattern = version_compare(PHP_VERSION, '8.3', '<')
+            ? '/<code>.*?<span style\="color\: \#\d+">.*?&lt;\?php/'
+            : '/<pre>.*?<code style\="color\: \#\d+">.*?<span style\="color\: \#[a-zA-Z0-9]+">.*?&lt;\?php/';
         $this->assertMatchesRegularExpression($pattern, $result[0]);
 
         $result = Debugger::excerpt(__FILE__, 11, 2);
@@ -277,7 +281,7 @@ class DebuggerTest extends TestCase
             $this->assertStringContainsString('notice: 8 :: Error description', $result);
             $this->assertStringContainsString("on line {$data['line']} of {$data['file']}", $result);
             $this->assertStringContainsString('Trace:', $result);
-            $this->assertStringContainsString('Cake\Test\TestCase\Error\DebuggerTest::testOutputErrorText()', $result);
+            $this->assertStringContainsString('Cake\Test\TestCase\Error\DebuggerTest->testOutputErrorText()', $result);
             $this->assertStringContainsString('[main]', $result);
         });
     }
@@ -309,14 +313,13 @@ class DebuggerTest extends TestCase
 
             $this->assertSame('', $output);
             $this->assertCount(1, $logs);
-            // This is silly but that's how it works currently.
-            $this->assertStringContainsString("debug: \nCake\Error\Debugger::outputError()", $logs[0]);
+            $this->assertStringContainsString('Cake\Error\Debugger->outputError()', $logs[0]);
 
             $this->assertStringContainsString("'file' => '{$data['file']}'", $logs[0]);
             $this->assertStringContainsString("'line' => (int) {$data['line']}", $logs[0]);
             $this->assertStringContainsString("'trace' => ", $logs[0]);
             $this->assertStringContainsString("'description' => 'Error description'", $logs[0]);
-            $this->assertStringContainsString('DebuggerTest::testOutputErrorLog()', $logs[0]);
+            $this->assertStringContainsString('DebuggerTest->testOutputErrorLog()', $logs[0]);
         });
     }
 
@@ -594,6 +597,10 @@ TEXT;
      */
     public function testExportVarSplFixedArray(): void
     {
+        $this->skipIf(
+            version_compare(PHP_VERSION, '8.3', '>='),
+            'Due to different get_object_vars() function behavior used in Debugger::exportObject()' // see. https://3v4l.org/DWpRl
+        );
         $subject = new SplFixedArray(2);
         $subject[0] = 'red';
         $subject[1] = 'blue';
@@ -645,6 +652,15 @@ TEXT;
     }
 
     /**
+     * Test exportVar with a mock
+     */
+    public function testExportVarMockObject(): void
+    {
+        $result = Debugger::exportVar($this->getMockBuilder(Table::class)->getMock());
+        $this->assertStringContainsString('object(Mock_Table', $result);
+    }
+
+    /**
      * Text exportVarAsNodes()
      */
     public function testExportVarAsNodes(): void
@@ -690,10 +706,10 @@ TEXT;
 
         $messages = Log::engine('test')->read();
         $this->assertCount(2, $messages);
-        $this->assertStringContainsString('DebuggerTest::testLog', $messages[0]);
+        $this->assertStringContainsString('DebuggerTest->testLog', $messages[0]);
         $this->assertStringContainsString('cool', $messages[0]);
 
-        $this->assertStringContainsString('DebuggerTest::testLog', $messages[1]);
+        $this->assertStringContainsString('DebuggerTest->testLog', $messages[1]);
         $this->assertStringContainsString('[main]', $messages[1]);
         $this->assertStringContainsString("'whatever'", $messages[1]);
         $this->assertStringContainsString("'here'", $messages[1]);
@@ -748,7 +764,7 @@ TEXT;
         Debugger::log($veryRandomName, 'debug', 0);
 
         $messages = Log::engine('test')->read();
-        $this->assertStringContainsString('DebuggerTest::testLogDepth', $messages[0]);
+        $this->assertStringContainsString('DebuggerTest->testLogDepth', $messages[0]);
         $this->assertStringContainsString('test', $messages[0]);
         $this->assertStringNotContainsString('veryRandomName', $messages[0]);
     }
@@ -847,12 +863,33 @@ TEXT;
     public function testTraceExclude(): void
     {
         $result = Debugger::trace();
-        $this->assertMatchesRegularExpression('/^Cake\\\Test\\\TestCase\\\Error\\\DebuggerTest::testTraceExclude/', $result);
+        $this->assertMatchesRegularExpression('/^Cake\\\Test\\\TestCase\\\Error\\\DebuggerTest..testTraceExclude/m', $result);
 
         $result = Debugger::trace([
-            'exclude' => ['Cake\Test\TestCase\Error\DebuggerTest::testTraceExclude'],
+            'exclude' => ['Cake\Test\TestCase\Error\DebuggerTest->testTraceExclude'],
         ]);
-        $this->assertDoesNotMatchRegularExpression('/^Cake\\\Test\\\TestCase\\\Error\\\DebuggerTest::testTraceExclude/', $result);
+        $this->assertDoesNotMatchRegularExpression('/^Cake\\\Test\\\TestCase\\\Error\\\DebuggerTest..testTraceExclude/m', $result);
+    }
+
+    protected function _makeException()
+    {
+        return new RuntimeException('testing');
+    }
+
+    /**
+     * Test stack frame comparisons.
+     */
+    public function testGetUniqueFrames()
+    {
+        $parent = new RuntimeException('parent');
+        $child = $this->_makeException();
+
+        $result = Debugger::getUniqueFrames($child, $parent);
+        $this->assertCount(1, $result);
+        $this->assertEquals(__LINE__ - 4, $result[0]['line']);
+
+        $result = Debugger::getUniqueFrames($child, null);
+        $this->assertGreaterThan(1, count($result));
     }
 
     /**

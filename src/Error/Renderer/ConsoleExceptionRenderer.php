@@ -19,6 +19,7 @@ namespace Cake\Error\Renderer;
 use Cake\Console\ConsoleOutput;
 use Cake\Core\Configure;
 use Cake\Core\Exception\CakeException;
+use Cake\Error\Debugger;
 use Psr\Http\Message\ServerRequestInterface;
 use Throwable;
 
@@ -68,35 +69,62 @@ class ConsoleExceptionRenderer
      */
     public function render()
     {
+        $exceptions = [$this->error];
+        $previous = $this->error->getPrevious();
+        while ($previous !== null) {
+            $exceptions[] = $previous;
+            $previous = $previous->getPrevious();
+        }
         $out = [];
-        $out[] = sprintf(
-            '<error>[%s] %s</error> in %s on line %s',
-            get_class($this->error),
-            $this->error->getMessage(),
-            $this->error->getFile(),
-            $this->error->getLine()
-        );
+        foreach ($exceptions as $i => $error) {
+            $parent = $exceptions[$i - 1] ?? null;
+            $out = array_merge($out, $this->renderException($error, $parent));
+        }
+
+        return join("\n", $out);
+    }
+
+    /**
+     * Render an individual exception
+     *
+     * @param \Throwable $exception The exception to render.
+     * @param ?\Throwable $parent The Exception index in the chain
+     * @return array
+     */
+    protected function renderException(Throwable $exception, ?Throwable $parent): array
+    {
+        $out = [
+            sprintf(
+                '<error>%s[%s] %s</error> in %s on line %s',
+                $parent ? 'Caused by ' : '',
+                get_class($exception),
+                $exception->getMessage(),
+                $exception->getFile(),
+                $exception->getLine()
+            ),
+        ];
 
         $debug = Configure::read('debug');
-        if ($debug && $this->error instanceof CakeException) {
-            $attributes = $this->error->getAttributes();
+        if ($debug && $exception instanceof CakeException) {
+            $attributes = $exception->getAttributes();
             if ($attributes) {
                 $out[] = '';
                 $out[] = '<info>Exception Attributes</info>';
                 $out[] = '';
-                $out[] = var_export($this->error->getAttributes(), true);
+                $out[] = var_export($exception->getAttributes(), true);
             }
         }
 
         if ($this->trace) {
+            $stacktrace = Debugger::getUniqueFrames($exception, $parent);
             $out[] = '';
             $out[] = '<info>Stack Trace:</info>';
             $out[] = '';
-            $out[] = $this->error->getTraceAsString();
+            $out[] = Debugger::formatTrace($stacktrace, ['format' => 'txt']);
             $out[] = '';
         }
 
-        return join("\n", $out);
+        return $out;
     }
 
     /**

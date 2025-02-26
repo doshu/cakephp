@@ -64,6 +64,25 @@ class ServerRequestFactoryTest extends TestCase
         $this->assertSame($files['image']['type'], $expected->getClientMediaType());
     }
 
+    public function testFromGlobalsUriScheme(): void
+    {
+        $server = [
+            'DOCUMENT_ROOT' => '/cake/repo/webroot',
+            'PHP_SELF' => '/index.php',
+            'REQUEST_URI' => '/posts/add',
+            'HTTP_X_FORWARDED_PROTO' => 'https',
+        ];
+        $request = ServerRequestFactory::fromGlobals($server);
+
+        $this->assertSame('http', $request->scheme());
+        $this->assertSame('http', $request->getUri()->getScheme());
+
+        $request->setTrustedProxies([]);
+        // Yeah even setting an empty list of proxies does the trick.
+        $this->assertSame('https', $request->scheme());
+        $this->assertSame('https', $request->getUri()->getScheme());
+    }
+
     /**
      * Test fromGlobals includes the session
      *
@@ -102,6 +121,23 @@ class ServerRequestFactoryTest extends TestCase
     }
 
     /**
+     * Test fromGlobals with urlencoded path separators
+     */
+    public function testFromGlobalsUrlEncoded(): void
+    {
+        $server = [
+            'DOCUMENT_ROOT' => '/cake/repo/branches/webroot',
+            'PHP_SELF' => '/index.php',
+            'REQUEST_URI' => '/posts%2fadd',
+        ];
+        $res = ServerRequestFactory::fromGlobals($server);
+
+        $this->assertSame('', $res->getAttribute('base'));
+        $this->assertSame('/', $res->getAttribute('webroot'));
+        $this->assertSame('/posts%2fadd', $res->getUri()->getPath());
+    }
+
+    /**
      * Test fromGlobals with mod-rewrite server configuration.
      */
     public function testFromGlobalsUrlModRewrite(): void
@@ -122,7 +158,7 @@ class ServerRequestFactoryTest extends TestCase
         $request = ServerRequestFactory::fromGlobals([
             'DOCUMENT_ROOT' => '/cake/repo/branches',
             'PHP_SELF' => '/1.2.x.x/webroot/index.php',
-            'PATH_INFO' => '/posts/view/1',
+            'REQUEST_URI' => '/posts/view/1',
         ]);
         $this->assertSame('/1.2.x.x', $request->getAttribute('base'));
         $this->assertSame('/1.2.x.x/', $request->getAttribute('webroot'));
@@ -254,23 +290,6 @@ class ServerRequestFactoryTest extends TestCase
         $this->assertSame('/cakephp', $request->getAttribute('base'));
         $this->assertSame('/cakephp/', $request->getAttribute('webroot'));
         $this->assertSame('/bananas/eat/tasty_banana', $request->getRequestTarget());
-    }
-
-    /**
-     * Test that even if mod_rewrite is on, and the url contains index.php
-     * and there are numerous //s that the base/webroot is calculated correctly.
-     */
-    public function testBaseUrlWithModRewriteAndExtraSlashes(): void
-    {
-        $request = ServerRequestFactory::fromGlobals([
-            'REQUEST_URI' => '/cakephp/webroot///index.php/bananas/eat',
-            'PHP_SELF' => '/cakephp/webroot///index.php/bananas/eat',
-            'PATH_INFO' => '/bananas/eat',
-        ]);
-
-        $this->assertSame('/cakephp', $request->getAttribute('base'));
-        $this->assertSame('/cakephp/', $request->getAttribute('webroot'));
-        $this->assertSame('/bananas/eat', $request->getRequestTarget());
     }
 
     /**
@@ -989,6 +1008,7 @@ class ServerRequestFactoryTest extends TestCase
             'CONTENT_TYPE' => null,
             'HTTP_CONTENT_TYPE' => null,
             'ORIGINAL_REQUEST_METHOD' => 'PUT',
+            'HTTP_HOST' => 'localhost',
         ];
         $this->assertSame($expected, $request->getServerParams());
     }

@@ -22,12 +22,16 @@ use Cake\ORM\Association\Loader\SelectLoader;
 use Cake\ORM\Table;
 use Cake\Utility\Inflector;
 use Closure;
+use function Cake\Core\pluginSplit;
 
 /**
  * Represents an 1 - 1 relationship where the source side of the relation is
  * related to only one record in the target table and vice versa.
  *
  * An example of a HasOne association would be User has one Profile.
+ *
+ * @template T of \Cake\ORM\Table
+ * @mixin T
  */
 class HasOne extends Association
 {

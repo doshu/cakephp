@@ -23,6 +23,7 @@ use Cake\TestSuite\TestCase;
 use InvalidArgumentException;
 use Laminas\Diactoros\UploadedFile;
 use TestApp\Mailer\TestMessage;
+use function Cake\Core\env;
 
 /**
  * MessageTest class
@@ -647,12 +648,12 @@ HTML;
         $this->assertSame($expected, $result);
 
         $result = $this->message->fmtAddress(['cake@cakephp.org' => '寿限無寿限無五劫の擦り切れ海砂利水魚の水行末雲来末風来末食う寝る処に住む処やぶら小路の藪柑子パイポパイポパイポのシューリンガンシューリンガンのグーリンダイグーリンダイのポンポコピーのポンポコナーの長久命の長助']);
-        $expected = ["=?ISO-2022-JP?B?GyRCPHc4Qkw1PHc4Qkw1OF45ZSROOyQkakBaJGwzJDo9TXg/ZTV7GyhC?=\r\n" .
+        $expected = ["\"=?ISO-2022-JP?B?GyRCPHc4Qkw1PHc4Qkw1OF45ZSROOyQkakBaJGwzJDo9TXg/ZTV7GyhC?=\r\n" .
             " =?ISO-2022-JP?B?GyRCJE4/ZTlUS3YxQE1oS3ZJd01oS3Y/KSQmPzIkaz1oJEs9OyRgGyhC?=\r\n" .
             " =?ISO-2022-JP?B?GyRCPWgkZCRWJGk+Lk8pJE5pLjQ7O1IlUSUkJV0lUSUkJV0lUSUkGyhC?=\r\n" .
             " =?ISO-2022-JP?B?GyRCJV0kTiU3JWUhPCVqJXMlLCVzJTclZSE8JWolcyUsJXMkTiUwGyhC?=\r\n" .
             " =?ISO-2022-JP?B?GyRCITwlaiVzJUAlJCUwITwlaiVzJUAlJCROJV0lcyVdJTMlVCE8GyhC?=\r\n" .
-            ' =?ISO-2022-JP?B?GyRCJE4lXSVzJV0lMyVKITwkTkQ5NVdMPyRORDk9dRsoQg==?= <cake@cakephp.org>'];
+            ' =?ISO-2022-JP?B?GyRCJE4lXSVzJV0lMyVKITwkTkQ5NVdMPyRORDk9dRsoQg==?=" <cake@cakephp.org>'];
         $this->assertSame($expected, $result);
     }
 
@@ -1306,6 +1307,10 @@ HTML;
     public function testSerialization(): void
     {
         $message = new Message();
+        $reflection = new \ReflectionClass($message);
+        $property = $reflection->getProperty('serializableProperties');
+        $property->setAccessible(true);
+        $serializableProperties = $property->getValue($message);
 
         $message
             ->setSubject('I haz Cake')
@@ -1317,6 +1322,12 @@ HTML;
 
         $string = serialize($message);
         $this->assertStringContainsString('text message', $string);
+
+        $this->assertIsArray($serializableProperties);
+        $this->assertContains('subject', $serializableProperties);
+        $this->assertContains('emailFormat', $serializableProperties);
+        $this->assertContains('textMessage', $serializableProperties);
+        $this->assertContains('htmlMessage', $serializableProperties);
 
         /** @var \Cake\Mailer\Message $message */
         $message = unserialize($string);

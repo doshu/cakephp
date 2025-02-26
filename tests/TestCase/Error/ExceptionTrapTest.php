@@ -24,11 +24,13 @@ use Cake\Error\Renderer\ConsoleExceptionRenderer;
 use Cake\Error\Renderer\TextExceptionRenderer;
 use Cake\Error\Renderer\WebExceptionRenderer;
 use Cake\Http\Exception\MissingControllerException;
+use Cake\Http\Exception\NotFoundException;
 use Cake\Http\ServerRequest;
 use Cake\Log\Log;
 use Cake\TestSuite\TestCase;
 use Cake\Utility\Text;
 use InvalidArgumentException;
+use RuntimeException;
 use TestApp\Error\LegacyErrorLogger;
 use Throwable;
 
@@ -161,6 +163,25 @@ class ExceptionTrapTest extends TestCase
         $this->assertStringContainsString('->testHandleExceptionConsoleRenderingWithStack', $out[0]);
     }
 
+    public function testHandleExceptionConsoleRenderingWithPrevious()
+    {
+        $output = new StubConsoleOutput();
+        $trap = new ExceptionTrap([
+            'exceptionRenderer' => ConsoleExceptionRenderer::class,
+            'stderr' => $output,
+            'trace' => true,
+        ]);
+        $previous = new RuntimeException('underlying error');
+        $error = new InvalidArgumentException('nope', 0, $previous);
+
+        $trap->handleException($error);
+        $out = $output->messages();
+
+        $this->assertStringContainsString('nope', $out[0]);
+        $this->assertStringContainsString('Caused by [RuntimeException] underlying error', $out[0]);
+        $this->assertEquals(2, substr_count($out[0], 'Stack Trace'));
+    }
+
     public function testHandleExceptionConsoleWithAttributes()
     {
         $output = new StubConsoleOutput();
@@ -200,7 +221,8 @@ class ExceptionTrapTest extends TestCase
         $this->assertStringContainsString('<!DOCTYPE', $out);
         $this->assertStringContainsString('<html', $out);
         $this->assertStringContainsString('nope', $out);
-        $this->assertStringContainsString('ExceptionTrapTest', $out);
+        $this->assertStringContainsString('class="stack-frame-header"', $out);
+        $this->assertStringContainsString('Toggle Arguments', $out);
     }
 
     public function testLogException()
@@ -284,7 +306,6 @@ class ExceptionTrapTest extends TestCase
         $trap->getEventManager()->on('Exception.beforeRender', function ($event, Throwable $error) {
             $this->assertEquals(100, $error->getCode());
             $this->assertStringContainsString('nope', $error->getMessage());
-            $event->stopPropagation();
         });
         $error = new InvalidArgumentException('nope', 100);
 
@@ -293,6 +314,52 @@ class ExceptionTrapTest extends TestCase
         $out = ob_get_clean();
 
         $this->assertNotEmpty($out);
+    }
+
+    public function testBeforeRenderEventAborted(): void
+    {
+        $trap = new ExceptionTrap(['exceptionRenderer' => TextExceptionRenderer::class]);
+        $trap->getEventManager()->on('Exception.beforeRender', function ($event, Throwable $error, ?ServerRequest $req) {
+            $this->assertEquals(100, $error->getCode());
+            $this->assertStringContainsString('nope', $error->getMessage());
+            $event->stopPropagation();
+        });
+        $error = new InvalidArgumentException('nope', 100);
+
+        ob_start();
+        $trap->handleException($error);
+        $out = ob_get_clean();
+
+        $this->assertSame('', $out);
+    }
+
+    public function testBeforeRenderEventExceptionChanged(): void
+    {
+        $trap = new ExceptionTrap(['exceptionRenderer' => TextExceptionRenderer::class]);
+        $trap->getEventManager()->on('Exception.beforeRender', function ($event, Throwable $error, ?ServerRequest $req) {
+            $event->setData('exception', new NotFoundException());
+        });
+        $error = new InvalidArgumentException('nope', 100);
+
+        ob_start();
+        $trap->handleException($error);
+        $out = ob_get_clean();
+
+        $this->assertStringContainsString('404 : Not Found', $out);
+    }
+
+    public function testBeforeRenderEventReturnResponse(): void
+    {
+        $trap = new ExceptionTrap(['exceptionRenderer' => TextExceptionRenderer::class]);
+        $trap->getEventManager()->on('Exception.beforeRender', function ($event, Throwable $error, ?ServerRequest $req) {
+            return 'Here B Erroz';
+        });
+
+        ob_start();
+        $trap->handleException(new NotFoundException());
+        $out = ob_get_clean();
+
+        $this->assertSame('Here B Erroz', $out);
     }
 
     public function testHandleShutdownNoOp()
